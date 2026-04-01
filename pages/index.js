@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
