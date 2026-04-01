@@ -6,6 +6,7 @@ import { setAdminAccess, removeAdminAccess } from '../lib/devToolsProtection';
 
 export default function AdminPanel() {
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState('email'); // 'email' or 'google'
@@ -32,17 +33,28 @@ export default function AdminPanel() {
   ]);
 
   useEffect(() => {
+    let mounted = true;
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      if (!mounted) return;
+      
       if (currentUser && isAdmin(currentUser.email)) {
         setUser(currentUser);
         setAdminAccess(ADMIN_EMAIL);
+        setError('');
         loadData();
       } else if (currentUser) {
         setError('Only admin can access this panel');
         auth.signOut();
+        setUser(null);
+      } else {
+        setUser(null);
       }
+      setAuthLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const loadData = () => {
@@ -61,9 +73,15 @@ export default function AdminPanel() {
       if (!isAdmin(result.user.email)) {
         setError('Only admin can access this panel');
         await auth.signOut();
+        setUser(null);
+      } else {
+        // Auth state listener will handle setting user
+        setError('');
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Google login error:', err);
+      setError(err.message || 'Login failed');
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -81,16 +99,22 @@ export default function AdminPanel() {
     if (trimmedEmail === ADMIN_EMAIL && trimmedPassword === ADMIN_PASSWORD) {
       try {
         await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+        // Auth state listener will handle setting user
+        setError('');
       } catch (err) {
         // If user doesn't exist, create account
         if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
           try {
             await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+            // Auth state listener will handle setting user
+            setError('');
           } catch (createErr) {
-            setError(createErr.message);
+            console.error('Create user error:', createErr);
+            setError(createErr.message || 'Failed to create account');
           }
         } else {
-          setError(err.message);
+          console.error('Login error:', err);
+          setError(err.message || 'Login failed');
         }
       }
     } else {
@@ -165,6 +189,17 @@ export default function AdminPanel() {
       alert('❌ Error: ' + error.message);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-[3px] border-orange-200 border-t-orange-500 animate-spin" />
+          <p className="text-gray-700 font-semibold">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
