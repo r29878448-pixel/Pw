@@ -31,12 +31,6 @@ export default function AdminPanel() {
     { batchId: '67790151518b938bc630052d', batchName: 'Udaan 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
   ]);
 
-<<<<<<< HEAD
-=======
-  // Admin password (change this to your secure password)
-  const ADMIN_PASSWORD = 'aditya-ghoghari';
-
->>>>>>> b4763e15be74388456dffd09c7f249e41dc7406b
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       if (currentUser && isAdmin(currentUser.email)) {
