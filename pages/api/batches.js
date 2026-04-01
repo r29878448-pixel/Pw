@@ -1,5 +1,5 @@
 const { safeDecrypt } = require('../../lib/decrypt');
-const PW = 'https://apiserver-skpg.onrender.com';
+const { getApiUrl } = require('../../lib/apiConfig');
 
 // In-memory cache — batches rarely change
 let cache = null;
@@ -8,6 +8,12 @@ const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Get API URL from config
+  const PW = getApiUrl();
+  if (!PW) {
+    return res.status(503).json({ error: 'API not configured. Please contact admin.' });
+  }
 
   // Serve from cache if fresh
   if (cache && Date.now() - cacheTime < CACHE_TTL) {

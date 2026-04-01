@@ -7,7 +7,7 @@
  * 4. Return { mpdUrl, kid, key } for Shaka clearKeys
  */
 const { safeDecrypt } = require('../../lib/decrypt');
-const PW = 'https://apiserver-skpg.onrender.com';
+const { getApiUrl } = require('../../lib/apiConfig');
 
 async function fetchText(url) {
   const r = await fetch(url, {
@@ -35,6 +35,13 @@ function extractKid(mpdXml) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  // Get API URL from config
+  const PW = getApiUrl();
+  if (!PW) {
+    return res.status(503).json({ error: 'API not configured. Please contact admin.' });
+  }
+  
   const { findKey, batchId, subjectId, mpdUrl } = req.query;
 
   if (!findKey) return res.status(400).json({ error: 'findKey required' });

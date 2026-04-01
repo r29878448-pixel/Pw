@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
@@ -491,7 +492,7 @@ function SubjectsView({ batchId, batch, subjects, trail }) {
 
 // ─── Featured Batches ─────────────────────────────────────────────────────────
 
-const FEATURED_BATCHES = [
+const DEFAULT_BATCHES = [
   { batchId: '698ad3519549b300a5e1cc6a', batchName: 'Arjuna JEE 2027', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/arjuna-jee-2027.png', _tag: 'JEE' },
   { batchId: '69897f0ad7c19b7b2f7cc35f', batchName: 'Arjuna NEET 2027', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/arjuna-neet-2027.png', _tag: 'NEET' },
   { batchId: '699434fe5423bd3d67b049b6', batchName: 'UDAAN 2.0 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
@@ -499,16 +500,57 @@ const FEATURED_BATCHES = [
 ];
 
 function BatchesGrid({ onSelect }) {
+  const [batches, setBatches] = useState([]);
+  const [apiConfigured, setApiConfigured] = useState(false);
+
+  useEffect(() => {
+    // Check if API is configured
+    const apiUrl = getApiUrl();
+    setApiConfigured(!!apiUrl);
+
+    // Load custom batches and merge with defaults
+    const customBatches = getCustomBatches();
+    const allBatches = [...customBatches, ...DEFAULT_BATCHES];
+    
+    // Apply edits to all batches
+    const batchesWithEdits = allBatches.map(batch => getBatchWithEdits(batch));
+    setBatches(batchesWithEdits);
+  }, []);
   return (
     <div>
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl text-3xl shadow-lg mb-4">⚡</div>
         <h1 className="text-3xl font-bold text-gray-900">Physics Wallah</h1>
         <p className="text-gray-500 text-sm mt-2">Apna batch choose karo</p>
+        
+        {/* API Status & Admin Link */}
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            apiConfigured 
+              ? 'bg-green-100 text-green-700' 
+              : 'bg-red-100 text-red-700'
+          }`}>
+            {apiConfigured ? '✅ API Configured' : '⚠️ API Not Configured'}
+          </div>
+          <a 
+            href="/admin" 
+            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-200 transition"
+          >
+            🔐 Admin Panel
+          </a>
+        </div>
       </div>
 
+      {!apiConfigured && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
+          <p className="text-yellow-800 text-sm font-medium">
+            ⚠️ API not configured. Please configure API URL in Admin Panel to fetch batch data.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 max-w-5xl mx-auto">
-        {FEATURED_BATCHES.map((batch, idx) => {
+        {batches.map((batch, idx) => {
           const tagColors = ['from-blue-500 to-indigo-600', 'from-emerald-500 to-teal-600', 'from-purple-500 to-violet-600', 'from-orange-500 to-red-600'];
           return (
             <div key={batch.batchId} onClick={() => onSelect(batch.batchId, batch)}
@@ -518,11 +560,11 @@ function BatchesGrid({ onSelect }) {
               </div>
               <div className="p-6">
                 <div className="text-4xl mb-4">
-                  {idx === 0 ? '🔬' : idx === 1 ? '🧬' : idx === 2 ? '📚' : '📖'}
+                  {batch._custom ? '⭐' : idx === 0 ? '🔬' : idx === 1 ? '🧬' : idx === 2 ? '📚' : '📖'}
                 </div>
                 <p className="font-bold text-white text-base leading-snug">{batch.batchName}</p>
                 <div className="mt-4 flex items-center gap-2 text-white/80 text-xs font-medium">
-                  <span>Open Batch</span>
+                  <span>{batch._custom ? 'Custom Batch' : 'Open Batch'}</span>
                   <span>→</span>
                 </div>
               </div>

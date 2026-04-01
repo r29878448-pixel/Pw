@@ -3,10 +3,17 @@
  * Fetches PDF URL using attachments-url then attachment-link fallback
  */
 const { safeDecrypt } = require('../../lib/decrypt');
-const PW = 'https://apiserver-skpg.onrender.com';
+const { getApiUrl } = require('../../lib/apiConfig');
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  // Get API URL from config
+  const PW = getApiUrl();
+  if (!PW) {
+    return res.status(503).json({ error: 'API not configured. Please contact admin.' });
+  }
+  
   const { batchId, subjectId, scheduleId } = req.query;
   if (!batchId || !subjectId || !scheduleId)
     return res.status(400).json({ error: 'batchId, subjectId, scheduleId required' });
