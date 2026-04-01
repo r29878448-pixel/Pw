@@ -1,13 +1,28 @@
 const { safeDecrypt } = require('../../lib/decrypt');
+const { db } = require('../../lib/firebase');
+const { doc, getDoc } = require('firebase/firestore');
 
-// Use default API URL directly in API routes (server-side)
-const DEFAULT_API_URL = 'https://adc.onrender.app';
+// Get API URL from Firebase
+async function getApiUrl() {
+  try {
+    const docRef = doc(db, 'config', 'api');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return docSnap.data().baseUrl || 'https://adc.onrender.app';
+    }
+  } catch (error) {
+    console.error('Error loading API URL:', error);
+  }
+  return 'https://adc.onrender.app'; // Fallback
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
-  // Use default API URL for server-side requests
-  const PW = DEFAULT_API_URL;
+  // Get API URL from Firebase
+  const PW = await getApiUrl();
+  console.log('Using API:', PW);
   
   const { batchId } = req.query;
   if (!batchId) return res.status(400).json({ error: 'batchId required' });

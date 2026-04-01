@@ -2,140 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { auth, googleProvider } from '../lib/firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
-import { safeDecrypt } from '../lib/decryptBrowser';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
-// Direct API calls to backend (bypassing Vercel API routes)
+// API calls through Vercel routes (handles CORS properly)
 const api = async (endpoint) => {
-  // Get API base URL from Firebase
-  const baseUrl = await getApiUrl();
+  console.log('🌐 API Call:', endpoint);
   
-  // Map frontend endpoints to backend endpoints
-  const endpointMap = {
-    '/api/batches': '/api/pw/batches',
-    '/api/batchdetails': '/api/pw/batchdetails',
-    '/api/topics': '/api/pw/topics',
-    '/api/content': '/api/pw/datacontent',
-    '/api/videourl': '/api/pw/videonew',
-    '/api/pdfurl': '/api/pw/attachments-url',
-  };
-  
-  // Extract path and query params
-  const [path, queryString] = endpoint.split('?');
-  const backendPath = endpointMap[path] || path;
-  
-  console.log('🌐 API Call:', path, '→', baseUrl + backendPath);
-  
-  // For batchdetails, use POST method
-  if (path === '/api/batchdetails' && queryString) {
-    const params = new URLSearchParams(queryString);
-    const batchId = params.get('batchId');
-    
-    const r = await fetch(`${baseUrl}/api/pw/batchdetails`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ searchParams: { BatchId: batchId } }),
-    });
-    
-    if (!r.ok) throw new Error(`API ${r.status}`);
-    const json = await r.json();
-    
-    // Handle encrypted response
-    if (json?.data && typeof json.data === 'string') {
-      const decrypted = await safeDecrypt(json.data);
-      return decrypted || json;
-    }
-    return json;
-  }
-  
-  // For batches, use GET
-  if (path === '/api/batches') {
-    const r = await fetch(`${baseUrl}/api/pw/batches`);
-    if (!r.ok) throw new Error(`API ${r.status}`);
-    const json = await r.json();
-    
-    // Handle encrypted response
-    if (json?.data && typeof json.data === 'string') {
-      const decrypted = await safeDecrypt(json.data);
-      return decrypted || json;
-    }
-    return json;
-  }
-  
-  // For topics, use GET with query params
-  if (path === '/api/topics' && queryString) {
-    const params = new URLSearchParams(queryString);
-    const batchId = params.get('batchId');
-    const subjectSlug = params.get('subjectSlug');
-    
-    const r = await fetch(`${baseUrl}/api/pw/topics?BatchId=${batchId}&SubjectId=${subjectSlug}`);
-    if (!r.ok) throw new Error(`API ${r.status}`);
-    const json = await r.json();
-    
-    // Handle encrypted response
-    if (json?.data && typeof json.data === 'string') {
-      const decrypted = await safeDecrypt(json.data);
-      return decrypted || json;
-    }
-    return json;
-  }
-  
-  // For content (datacontent), use GET with query params
-  if (path === '/api/content' && queryString) {
-    const params = new URLSearchParams(queryString);
-    const batchId = params.get('batchId');
-    const subjectSlug = params.get('subjectSlug');
-    const topicSlug = params.get('topicSlug');
-    const contentType = params.get('contentType');
-    
-    const r = await fetch(`${baseUrl}/api/pw/datacontent?batchId=${batchId}&subjectSlug=${subjectSlug}&topicSlug=${topicSlug}&contentType=${contentType}`);
-    if (!r.ok) throw new Error(`API ${r.status}`);
-    const json = await r.json();
-    
-    // Handle encrypted response
-    if (json?.data && typeof json.data === 'string') {
-      const decrypted = await safeDecrypt(json.data);
-      return decrypted || json;
-    }
-    return json;
-  }
-  
-  // For PDF URLs (attachments-url)
-  if (path === '/api/pdfurl' && queryString) {
-    const params = new URLSearchParams(queryString);
-    const batchId = params.get('batchId');
-    const subjectId = params.get('subjectId');
-    const scheduleId = params.get('scheduleId');
-    
-    const r = await fetch(`${baseUrl}/api/pw/attachments-url?BatchId=${batchId}&SubjectId=${subjectId}&ContentId=${scheduleId}`);
-    if (!r.ok) throw new Error(`API ${r.status}`);
-    const json = await r.json();
-    
-    // Handle encrypted response
-    if (json?.data && typeof json.data === 'string') {
-      const decrypted = await safeDecrypt(json.data);
-      return decrypted || json;
-    }
-    return json;
-  }
-  
-  // Fallback: direct fetch
-  const fullUrl = queryString 
-    ? `${baseUrl}${backendPath}?${queryString}`
-    : `${baseUrl}${backendPath}`;
-  
-  const r = await fetch(fullUrl);
+  const r = await fetch(endpoint);
   if (!r.ok) throw new Error(`API ${r.status}`);
-  const json = await r.json();
-  
-  // Handle encrypted response
-  if (json?.data && typeof json.data === 'string') {
-    const decrypted = await safeDecrypt(json.data);
-    return decrypted || json;
-  }
-  
-  return json;
+  return r.json();
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
