@@ -40,6 +40,7 @@ export default function AdminPanel() {
   useEffect(() => {
     console.log('[Admin] Setting up auth listener');
     let mounted = true;
+    let isCheckingRedirect = true;
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -50,7 +51,7 @@ export default function AdminPanel() {
             console.log('[Admin] Non-admin from redirect, signing out');
             setError('Only admin can access this panel');
             isSigningOut.current = true;
-            auth.signOut().then(() => {
+            return auth.signOut().then(() => {
               isSigningOut.current = false;
             });
           }
@@ -58,12 +59,23 @@ export default function AdminPanel() {
       })
       .catch((error) => {
         console.error('[Admin] Redirect error:', error);
-        setError(error.message || 'Login failed');
+        if (error.code !== 'auth/popup-closed-by-user') {
+          setError(error.message || 'Login failed');
+        }
+      })
+      .finally(() => {
+        isCheckingRedirect = false;
       });
     
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       if (!mounted) {
         console.log('[Admin] Component unmounted, ignoring auth change');
+        return;
+      }
+      
+      // Skip if still checking redirect
+      if (isCheckingRedirect) {
+        console.log('[Admin] Still checking redirect, skipping...');
         return;
       }
       

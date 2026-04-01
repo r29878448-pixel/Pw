@@ -576,6 +576,8 @@ export default function Home() {
   const [loginError, setLoginError] = useState('');
 
   useEffect(() => {
+    let isCheckingRedirect = true;
+    
     // Check for redirect result first
     getRedirectResult(auth)
       .then((result) => {
@@ -586,12 +588,19 @@ export default function Home() {
       })
       .catch((error) => {
         console.error('[Home] Redirect error:', error);
-        setLoginError(error.message || 'Login failed');
+        if (error.code !== 'auth/popup-closed-by-user') {
+          setLoginError(error.message || 'Login failed');
+        }
+      })
+      .finally(() => {
+        isCheckingRedirect = false;
       });
     
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
+      if (!isCheckingRedirect) {
+        setUser(currentUser);
+        setAuthLoading(false);
+      }
     });
     return () => unsubscribe();
   }, []);
