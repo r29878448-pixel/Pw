@@ -576,9 +576,19 @@ export default function Home() {
   const [loginError, setLoginError] = useState('');
   
   const isCheckingRedirect = useRef(true);
+  const authCheckTimeout = useRef(null);
 
   useEffect(() => {
     console.log('[Home] Setting up auth');
+    
+    // Fallback timeout - force stop loading after 5 seconds
+    authCheckTimeout.current = setTimeout(() => {
+      console.log('[Home] ⚠️ Auth check timeout - forcing stop loading');
+      if (isCheckingRedirect.current) {
+        isCheckingRedirect.current = false;
+        setAuthLoading(false);
+      }
+    }, 5000);
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -597,6 +607,9 @@ export default function Home() {
       .finally(() => {
         console.log('[Home] Redirect check complete');
         isCheckingRedirect.current = false;
+        if (authCheckTimeout.current) {
+          clearTimeout(authCheckTimeout.current);
+        }
       });
     
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -606,7 +619,13 @@ export default function Home() {
         setAuthLoading(false);
       }
     });
-    return () => unsubscribe();
+    
+    return () => {
+      if (authCheckTimeout.current) {
+        clearTimeout(authCheckTimeout.current);
+      }
+      unsubscribe();
+    };
   }, []);
 
   const handleGoogleLogin = async () => {

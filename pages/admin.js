@@ -28,6 +28,7 @@ export default function AdminPanel() {
   const isSigningOut = useRef(false);
   const hasLoadedData = useRef(false);
   const isCheckingRedirect = useRef(true);
+  const authCheckTimeout = useRef(null);
   
   // Default batches for editing
   const [defaultBatches] = useState([
@@ -41,6 +42,15 @@ export default function AdminPanel() {
   useEffect(() => {
     console.log('[Admin] Setting up auth listener');
     let mounted = true;
+    
+    // Fallback timeout - force stop loading after 5 seconds
+    authCheckTimeout.current = setTimeout(() => {
+      console.log('[Admin] ⚠️ Auth check timeout - forcing stop loading');
+      if (isCheckingRedirect.current) {
+        isCheckingRedirect.current = false;
+        setAuthLoading(false);
+      }
+    }, 5000);
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -66,6 +76,9 @@ export default function AdminPanel() {
       .finally(() => {
         console.log('[Admin] Redirect check complete');
         isCheckingRedirect.current = false;
+        if (authCheckTimeout.current) {
+          clearTimeout(authCheckTimeout.current);
+        }
       });
     
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -101,11 +114,15 @@ export default function AdminPanel() {
         // Load data only once
         if (!hasLoadedData.current) {
           console.log('[Admin] Loading data...');
-          const url = getApiUrl();
-          setApiUrlState(url || '');
-          const batches = getCustomBatches();
-          setCustomBatches(batches);
-          hasLoadedData.current = true;
+          try {
+            const url = getApiUrl();
+            setApiUrlState(url || '');
+            const batches = getCustomBatches();
+            setCustomBatches(batches);
+            hasLoadedData.current = true;
+          } catch (err) {
+            console.error('[Admin] Error loading data:', err);
+          }
         }
         
         setAuthLoading(false);
@@ -134,6 +151,9 @@ export default function AdminPanel() {
     return () => {
       console.log('[Admin] Cleaning up auth listener');
       mounted = false;
+      if (authCheckTimeout.current) {
+        clearTimeout(authCheckTimeout.current);
+      }
       unsubscribe();
     };
   }, []); // Empty dependency array - runs ONCE
