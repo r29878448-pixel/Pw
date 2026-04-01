@@ -522,29 +522,12 @@ function BatchesGrid({ onSelect }) {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl text-3xl shadow-lg mb-4">⚡</div>
         <h1 className="text-3xl font-bold text-gray-900">Physics Wallah</h1>
         <p className="text-gray-500 text-sm mt-2">Apna batch choose karo</p>
-        
-        {/* API Status & Admin Link */}
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-            apiConfigured 
-              ? 'bg-green-100 text-green-700' 
-              : 'bg-red-100 text-red-700'
-          }`}>
-            {apiConfigured ? '✅ API Configured' : '⚠️ API Not Configured'}
-          </div>
-          <a 
-            href="/admin" 
-            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-200 transition"
-          >
-            🔐 Admin Panel
-          </a>
-        </div>
       </div>
 
       {!apiConfigured && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
-          <p className="text-yellow-800 text-sm font-medium">
-            ⚠️ API not configured. Please configure API URL in Admin Panel to fetch batch data.
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+          <p className="text-red-800 text-sm font-medium">
+            😔 Sorry! Server is temporarily down. Please try again later.
           </p>
         </div>
       )}
