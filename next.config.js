@@ -17,6 +17,14 @@ module.exports = {
             key: 'Content-Security-Policy',
             value: "frame-src 'self' https://deltastudy.site https://apiserver-6hat.onrender.com https://apiserver-skpg.onrender.com https://pw-missiontopper.firebaseapp.com https://accounts.google.com https://vercel.live;",
           },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'unsafe-none',
+          },
         ],
       },
     ];

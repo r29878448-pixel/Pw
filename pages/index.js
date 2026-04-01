@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { auth, googleProvider } from '../lib/firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -576,6 +576,19 @@ export default function Home() {
   const [loginError, setLoginError] = useState('');
 
   useEffect(() => {
+    // Check for redirect result first
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          console.log('[Home] User logged in via redirect:', result.user.email);
+          setShowLoginModal(false);
+        }
+      })
+      .catch((error) => {
+        console.error('[Home] Redirect error:', error);
+        setLoginError(error.message || 'Login failed');
+      });
+    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
@@ -586,8 +599,8 @@ export default function Home() {
   const handleGoogleLogin = async () => {
     setLoginError('');
     try {
-      await signInWithPopup(auth, googleProvider);
-      setShowLoginModal(false);
+      // Use redirect instead of popup
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       setLoginError(err.message || 'Login failed');
     }

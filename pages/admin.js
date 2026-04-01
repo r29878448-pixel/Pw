@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider, ADMIN_EMAIL, ADMIN_PASSWORD, isAdmin } from '../lib/firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getApiUrl, setApiUrl, getCustomBatches, addCustomBatch, removeCustomBatch, updateCustomBatch, getAllBatchesForEdit, saveBatchEdit } from '../lib/apiConfig';
 import { setAdminAccess, removeAdminAccess } from '../lib/devToolsProtection';
 
@@ -40,6 +40,26 @@ export default function AdminPanel() {
   useEffect(() => {
     console.log('[Admin] Setting up auth listener');
     let mounted = true;
+    
+    // Check for redirect result first
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          console.log('[Admin] Redirect result:', result.user.email);
+          if (!isAdmin(result.user.email)) {
+            console.log('[Admin] Non-admin from redirect, signing out');
+            setError('Only admin can access this panel');
+            isSigningOut.current = true;
+            auth.signOut().then(() => {
+              isSigningOut.current = false;
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('[Admin] Redirect error:', error);
+        setError(error.message || 'Login failed');
+      });
     
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       if (!mounted) {
@@ -106,30 +126,17 @@ export default function AdminPanel() {
   }, []); // Empty dependency array - runs ONCE
 
   const handleGoogleLogin = async () => {
-    console.log('[Admin] Google login initiated');
+    console.log('[Admin] Google login initiated (redirect method)');
     setLoading(true);
     setError('');
     
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log('[Admin] Google login result:', result.user.email);
-      
-      if (!isAdmin(result.user.email)) {
-        console.log('[Admin] Non-admin email, rejecting');
-        setError('Only admin can access this panel');
-        isSigningOut.current = true;
-        await auth.signOut();
-        isSigningOut.current = false;
-        setUser(null);
-      } else {
-        console.log('[Admin] Admin email confirmed');
-        setError('');
-      }
+      // Use redirect instead of popup to avoid COOP issues
+      await signInWithRedirect(auth, googleProvider);
+      // User will be redirected, no need to handle result here
     } catch (err) {
       console.error('[Admin] Google login error:', err);
       setError(err.message || 'Login failed');
-      setUser(null);
-    } finally {
       setLoading(false);
     }
   };
