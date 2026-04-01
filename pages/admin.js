@@ -35,6 +35,8 @@ export default function AdminPanel() {
     { batchId: '699434fe5423bd3d67b049b6', batchName: 'UDAAN 2.0 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
     { batchId: '67790151518b938bc630052d', batchName: 'Udaan 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
   ]);
+  
+  const [batchEdits, setBatchEdits] = useState({});
 
   // Simple auth check - runs ONCE
   useEffect(() => {
@@ -71,6 +73,11 @@ export default function AdminPanel() {
             // Load custom batches from Firebase
             const batches = await getCustomBatches();
             setCustomBatches(batches);
+            
+            // Load batch edits from Firebase
+            const edits = await getAllBatchesForEdit();
+            setBatchEdits(edits);
+            
             hasLoadedData.current = true;
           } catch (err) {
             console.error('[Admin] Load error:', err);
@@ -187,29 +194,35 @@ export default function AdminPanel() {
     }
   };
 
-  const handleEditBatch = (batch) => {
-    const edits = getAllBatchesForEdit();
-    const batchEdits = edits[batch.batchId] || {};
-    
-    setEditingBatch({
-      batchId: batch.batchId,
-      batchName: batchEdits.batchName || batch.batchName,
-      batchImage: batchEdits.batchImage || batch.batchImage,
-      _tag: batchEdits._tag || batch._tag,
-      _isCustom: batch._custom || false
-    });
+  const handleEditBatch = async (batch) => {
+    try {
+      const batchEditsData = batchEdits[batch.batchId] || {};
+      
+      setEditingBatch({
+        batchId: batch.batchId,
+        batchName: batchEditsData.batchName || batch.batchName,
+        batchImage: batchEditsData.batchImage || batch.batchImage,
+        _tag: batchEditsData._tag || batch._tag,
+        _isCustom: batch._custom || false
+      });
+    } catch (error) {
+      console.error('Error loading batch edits:', error);
+      alert('❌ Error loading batch data');
+    }
   };
 
   const handleSaveEdit = async () => {
     try {
       setLoading(true);
-      saveBatchEdit(editingBatch.batchId, {
+      
+      // Save edits to Firebase (works for both custom and default batches)
+      await saveBatchEdit(editingBatch.batchId, {
         batchName: editingBatch.batchName,
         batchImage: editingBatch.batchImage,
         _tag: editingBatch._tag
       });
       
-      // If it's a custom batch, also update in Firebase
+      // If it's a custom batch, also update the main batch document
       if (editingBatch._isCustom) {
         await updateCustomBatch(editingBatch.batchId, {
           batchName: editingBatch.batchName,
@@ -220,8 +233,12 @@ export default function AdminPanel() {
         setCustomBatches(batches);
       }
       
+      // Reload batch edits
+      const edits = await getAllBatchesForEdit();
+      setBatchEdits(edits);
+      
       setEditingBatch(null);
-      alert('✅ Batch updated successfully!');
+      alert('✅ Batch updated successfully! All users will see the changes.');
     } catch (error) {
       alert('❌ Error: ' + error.message);
     } finally {
@@ -479,11 +496,10 @@ export default function AdminPanel() {
 
           <div className="space-y-3">
             {defaultBatches.map((batch) => {
-              const edits = getAllBatchesForEdit();
-              const batchEdits = edits[batch.batchId] || {};
-              const displayName = batchEdits.batchName || batch.batchName;
-              const displayImage = batchEdits.batchImage || batch.batchImage;
-              const displayTag = batchEdits._tag || batch._tag;
+              const batchEditsData = batchEdits[batch.batchId] || {};
+              const displayName = batchEditsData.batchName || batch.batchName;
+              const displayImage = batchEditsData.batchImage || batch.batchImage;
+              const displayTag = batchEditsData._tag || batch._tag;
               
               return (
                 <div
@@ -594,11 +610,10 @@ export default function AdminPanel() {
           ) : (
             <div className="space-y-3">
               {customBatches.map((batch) => {
-                const edits = getAllBatchesForEdit();
-                const batchEdits = edits[batch.batchId] || {};
-                const displayName = batchEdits.batchName || batch.batchName;
-                const displayImage = batchEdits.batchImage || batch.batchImage;
-                const displayTag = batchEdits._tag || batch._tag;
+                const batchEditsData = batchEdits[batch.batchId] || {};
+                const displayName = batchEditsData.batchName || batch.batchName;
+                const displayImage = batchEditsData.batchImage || batch.batchImage;
+                const displayTag = batchEditsData._tag || batch._tag;
                 
                 return (
                   <div

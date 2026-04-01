@@ -655,10 +655,15 @@ function BatchesGrid({ onSelect }) {
         const customBatches = await getCustomBatches();
         const allBatches = [...customBatches, ...DEFAULT_BATCHES];
         
-        // Apply edits to all batches
-        const batchesWithEdits = allBatches.map(batch => getBatchWithEdits(batch));
+        // Apply edits to all batches from Firebase
+        const batchesWithEdits = await Promise.all(
+          allBatches.map(async (batch) => {
+            const editedBatch = await getBatchWithEdits(batch);
+            return editedBatch;
+          })
+        );
         
-        console.log('📦 Loaded batches:', batchesWithEdits.map(b => ({ 
+        console.log('📦 Loaded batches with edits:', batchesWithEdits.map(b => ({ 
           name: b.batchName, 
           image: b.batchImage,
           custom: b._custom || false
