@@ -26,6 +26,7 @@ export default function AdminPanel() {
   
   const hasLoadedData = useRef(false);
   const authCheckTimeout = useRef(null);
+  const isProcessingSignOut = useRef(false);
   
   // Default batches for editing
   const [defaultBatches] = useState([
@@ -52,6 +53,12 @@ export default function AdminPanel() {
         clearTimeout(authCheckTimeout.current);
       }
       
+      // CRITICAL: Skip if already processing sign out
+      if (isProcessingSignOut.current) {
+        console.log('[Admin] Already signing out, skipping...');
+        return;
+      }
+      
       if (currentUser && isAdmin(currentUser.email)) {
         console.log('[Admin] ✅ Admin authenticated');
         setUser(currentUser);
@@ -69,16 +76,33 @@ export default function AdminPanel() {
             console.error('[Admin] Load error:', err);
           }
         }
+        
+        setAuthLoading(false);
       } else if (currentUser) {
-        console.log('[Admin] ❌ Non-admin user');
+        console.log('[Admin] ❌ Non-admin user - signing out ONCE');
         setError('Only admin can access this panel');
-        auth.signOut();
-        setUser(null);
+        
+        // Set flag BEFORE signing out
+        isProcessingSignOut.current = true;
+        
+        auth.signOut().then(() => {
+          console.log('[Admin] Sign out complete');
+          setUser(null);
+          setAuthLoading(false);
+          // Reset flag after a delay
+          setTimeout(() => {
+            isProcessingSignOut.current = false;
+          }, 1000);
+        }).catch((err) => {
+          console.error('[Admin] Sign out error:', err);
+          isProcessingSignOut.current = false;
+          setAuthLoading(false);
+        });
       } else {
+        console.log('[Admin] No user');
         setUser(null);
+        setAuthLoading(false);
       }
-      
-      setAuthLoading(false);
     });
     
     return () => {
