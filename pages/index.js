@@ -581,14 +581,12 @@ export default function Home() {
   useEffect(() => {
     console.log('[Home] Setting up auth');
     
-    // Fallback timeout - force stop loading after 5 seconds
+    // Immediate fallback - set loading false after 2 seconds max
     authCheckTimeout.current = setTimeout(() => {
-      console.log('[Home] ⚠️ Auth check timeout - forcing stop loading');
-      if (isCheckingRedirect.current) {
-        isCheckingRedirect.current = false;
-        setAuthLoading(false);
-      }
-    }, 5000);
+      console.log('[Home] ⚠️ Auth check timeout (2s) - forcing stop loading');
+      isCheckingRedirect.current = false;
+      setAuthLoading(false);
+    }, 2000);
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -613,10 +611,12 @@ export default function Home() {
       });
     
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!isCheckingRedirect.current) {
-        console.log('[Home] Auth state:', currentUser?.email || 'No user');
-        setUser(currentUser);
-        setAuthLoading(false);
+      console.log('[Home] Auth state:', currentUser?.email || 'No user');
+      setUser(currentUser);
+      setAuthLoading(false);
+      isCheckingRedirect.current = false;
+      if (authCheckTimeout.current) {
+        clearTimeout(authCheckTimeout.current);
       }
     });
     

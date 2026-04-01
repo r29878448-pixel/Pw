@@ -38,19 +38,16 @@ export default function AdminPanel() {
     { batchId: '67790151518b938bc630052d', batchName: 'Udaan 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
   ]);
 
-  // Auth state listener - runs ONCE on mount
   useEffect(() => {
     console.log('[Admin] Setting up auth listener');
     let mounted = true;
     
-    // Fallback timeout - force stop loading after 5 seconds
+    // Immediate fallback - force stop loading after 2 seconds
     authCheckTimeout.current = setTimeout(() => {
-      console.log('[Admin] ⚠️ Auth check timeout - forcing stop loading');
-      if (isCheckingRedirect.current) {
-        isCheckingRedirect.current = false;
-        setAuthLoading(false);
-      }
-    }, 5000);
+      console.log('[Admin] ⚠️ Auth check timeout (2s) - forcing stop loading');
+      isCheckingRedirect.current = false;
+      setAuthLoading(false);
+    }, 2000);
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -87,17 +84,18 @@ export default function AdminPanel() {
         return;
       }
       
-      // Skip if still checking redirect
-      if (isCheckingRedirect.current) {
-        console.log('[Admin] Still checking redirect, skipping auth state...');
-        return;
-      }
-      
       console.log('[Admin] Auth state changed:', {
         user: currentUser?.email,
         isAdmin: currentUser ? isAdmin(currentUser.email) : false,
         isSigningOut: isSigningOut.current
       });
+      
+      // Always stop loading on auth state change
+      setAuthLoading(false);
+      isCheckingRedirect.current = false;
+      if (authCheckTimeout.current) {
+        clearTimeout(authCheckTimeout.current);
+      }
       
       // If we're in the process of signing out, don't process
       if (isSigningOut.current) {
@@ -124,8 +122,6 @@ export default function AdminPanel() {
             console.error('[Admin] Error loading data:', err);
           }
         }
-        
-        setAuthLoading(false);
       } else if (currentUser) {
         console.log('[Admin] ❌ Non-admin user detected, signing out...');
         setError('Only admin can access this panel');
@@ -135,16 +131,13 @@ export default function AdminPanel() {
           console.log('[Admin] Sign out complete');
           isSigningOut.current = false;
           setUser(null);
-          setAuthLoading(false);
         }).catch((err) => {
           console.error('[Admin] Sign out error:', err);
           isSigningOut.current = false;
-          setAuthLoading(false);
         });
       } else {
         console.log('[Admin] No user logged in');
         setUser(null);
-        setAuthLoading(false);
       }
     });
     
