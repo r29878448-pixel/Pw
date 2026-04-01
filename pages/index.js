@@ -540,23 +540,62 @@ function BatchesGrid({ onSelect }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 max-w-5xl mx-auto">
         {batches.map((batch, idx) => {
           const tagColors = ['from-blue-500 to-indigo-600', 'from-emerald-500 to-teal-600', 'from-purple-500 to-violet-600', 'from-orange-500 to-red-600'];
+          const thumbnail = batch.batchImage || batch.previewImage || batch.thumbnail;
+          
           return (
             <div key={batch.batchId} onClick={() => onSelect(batch.batchId, batch)}
-              className={`group relative bg-gradient-to-br ${tagColors[idx]} rounded-2xl overflow-hidden cursor-pointer hover:shadow-2xl transition-all hover:-translate-y-2 shadow-lg`}>
-              <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-bold">
-                {batch._tag}
-              </div>
-              <div className="p-6">
-                <div className="text-4xl mb-4">
-                  {batch._custom ? '⭐' : idx === 0 ? '🔬' : idx === 1 ? '🧬' : idx === 2 ? '📚' : '📖'}
+              className="group relative bg-white rounded-2xl overflow-hidden cursor-pointer hover:shadow-2xl transition-all hover:-translate-y-2 shadow-lg border border-gray-100">
+              
+              {/* Thumbnail Image */}
+              {thumbnail ? (
+                <div className="relative h-40 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                  <img 
+                    src={thumbnail} 
+                    alt={batch.batchName}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextElementSibling.style.display = 'flex';
+                    }}
+                  />
+                  {/* Fallback icon if image fails */}
+                  <div className="hidden absolute inset-0 items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+                    <span className="text-6xl">
+                      {batch._custom ? '⭐' : idx === 0 ? '🔬' : idx === 1 ? '🧬' : idx === 2 ? '📚' : '📖'}
+                    </span>
+                  </div>
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  {/* Tag badge */}
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-800 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">
+                    {batch._tag}
+                  </div>
                 </div>
-                <p className="font-bold text-white text-base leading-snug">{batch.batchName}</p>
-                <div className="mt-4 flex items-center gap-2 text-white/80 text-xs font-medium">
+              ) : (
+                // No thumbnail - show gradient with icon
+                <div className={`relative h-40 bg-gradient-to-br ${tagColors[idx]} flex items-center justify-center`}>
+                  <span className="text-6xl">
+                    {batch._custom ? '⭐' : idx === 0 ? '🔬' : idx === 1 ? '🧬' : idx === 2 ? '📚' : '📖'}
+                  </span>
+                  <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-bold">
+                    {batch._tag}
+                  </div>
+                </div>
+              )}
+              
+              {/* Content */}
+              <div className="p-4">
+                <p className="font-bold text-gray-900 text-base leading-snug line-clamp-2 mb-2">
+                  {batch.batchName}
+                </p>
+                <div className="flex items-center gap-2 text-gray-500 text-xs font-medium">
                   <span>{batch._custom ? 'Custom Batch' : 'Open Batch'}</span>
                   <span>→</span>
                 </div>
               </div>
-              <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-all" />
+              
+              {/* Hover effect */}
+              <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-all pointer-events-none" />
             </div>
           );
         })}
