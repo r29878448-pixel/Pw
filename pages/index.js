@@ -509,17 +509,31 @@ function BatchesGrid({ onSelect }) {
   const [apiConfigured, setApiConfigured] = useState(false);
 
   useEffect(() => {
-    // Check if API is configured
-    const apiUrl = getApiUrl();
-    setApiConfigured(!!apiUrl);
+    async function loadBatches() {
+      // Check if API is configured
+      try {
+        const apiUrl = await getApiUrl();
+        setApiConfigured(!!apiUrl);
+      } catch (e) {
+        console.error('Error loading API URL:', e);
+      }
 
-    // Load custom batches and merge with defaults
-    const customBatches = getCustomBatches();
-    const allBatches = [...customBatches, ...DEFAULT_BATCHES];
+      // Load custom batches and merge with defaults
+      const customBatches = getCustomBatches();
+      const allBatches = [...customBatches, ...DEFAULT_BATCHES];
+      
+      // Apply edits to all batches
+      const batchesWithEdits = allBatches.map(batch => getBatchWithEdits(batch));
+      
+      console.log('📦 Loaded batches:', batchesWithEdits.map(b => ({ 
+        name: b.batchName, 
+        image: b.batchImage 
+      })));
+      
+      setBatches(batchesWithEdits);
+    }
     
-    // Apply edits to all batches
-    const batchesWithEdits = allBatches.map(batch => getBatchWithEdits(batch));
-    setBatches(batchesWithEdits);
+    loadBatches();
   }, []);
   return (
     <div>
