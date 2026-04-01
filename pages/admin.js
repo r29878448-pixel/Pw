@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider, ADMIN_EMAIL, ADMIN_PASSWORD, isAdmin } from '../lib/firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getApiUrl, setApiUrl, getCustomBatches, addCustomBatch, removeCustomBatch, updateCustomBatch, getAllBatchesForEdit, saveBatchEdit } from '../lib/apiConfig';
 import { setAdminAccess, removeAdminAccess } from '../lib/devToolsProtection';
 
@@ -9,7 +9,7 @@ export default function AdminPanel() {
   const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginMode, setLoginMode] = useState('email'); // 'email' or 'google'
+  const [loginMode, setLoginMode] = useState('google'); // 'email' or 'google'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -24,6 +24,10 @@ export default function AdminPanel() {
     _tag: ''
   });
   
+  // Prevent infinite loop with ref
+  const isSigningOut = useRef(false);
+  const hasLoadedData = useRef(false);
+  
   // Default batches for editing
   const [defaultBatches] = useState([
     { batchId: '698ad3519549b300a5e1cc6a', batchName: 'Arjuna JEE 2027', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/arjuna-jee-2027.png', _tag: 'JEE' },
@@ -32,58 +36,97 @@ export default function AdminPanel() {
     { batchId: '67790151518b938bc630052d', batchName: 'Udaan 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
   ]);
 
-  const loadData = () => {
-    const url = getApiUrl();
-    setApiUrlState(url || '');
-    
-    const batches = getCustomBatches();
-    setCustomBatches(batches);
-  };
-
+  // Auth state listener - runs ONCE on mount
   useEffect(() => {
+    console.log('[Admin] Setting up auth listener');
     let mounted = true;
+    
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      if (!mounted) return;
+      if (!mounted) {
+        console.log('[Admin] Component unmounted, ignoring auth change');
+        return;
+      }
+      
+      console.log('[Admin] Auth state changed:', {
+        user: currentUser?.email,
+        isAdmin: currentUser ? isAdmin(currentUser.email) : false,
+        isSigningOut: isSigningOut.current
+      });
+      
+      // If we're in the process of signing out, don't process
+      if (isSigningOut.current) {
+        console.log('[Admin] Currently signing out, skipping...');
+        return;
+      }
       
       if (currentUser && isAdmin(currentUser.email)) {
+        console.log('[Admin] ✅ Admin user authenticated');
         setUser(currentUser);
         setAdminAccess(ADMIN_EMAIL);
         setError('');
-        // Load data directly here
-        const url = getApiUrl();
-        setApiUrlState(url || '');
-        const batches = getCustomBatches();
-        setCustomBatches(batches);
+        
+        // Load data only once
+        if (!hasLoadedData.current) {
+          console.log('[Admin] Loading data...');
+          const url = getApiUrl();
+          setApiUrlState(url || '');
+          const batches = getCustomBatches();
+          setCustomBatches(batches);
+          hasLoadedData.current = true;
+        }
+        
+        setAuthLoading(false);
       } else if (currentUser) {
+        console.log('[Admin] ❌ Non-admin user detected, signing out...');
         setError('Only admin can access this panel');
-        auth.signOut();
-        setUser(null);
+        isSigningOut.current = true;
+        
+        auth.signOut().then(() => {
+          console.log('[Admin] Sign out complete');
+          isSigningOut.current = false;
+          setUser(null);
+          setAuthLoading(false);
+        }).catch((err) => {
+          console.error('[Admin] Sign out error:', err);
+          isSigningOut.current = false;
+          setAuthLoading(false);
+        });
       } else {
+        console.log('[Admin] No user logged in');
         setUser(null);
+        setAuthLoading(false);
       }
-      setAuthLoading(false);
     });
+    
     return () => {
+      console.log('[Admin] Cleaning up auth listener');
       mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, []); // Empty dependency array - runs ONCE
 
   const handleGoogleLogin = async () => {
+    console.log('[Admin] Google login initiated');
     setLoading(true);
     setError('');
+    
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      console.log('[Admin] Google login result:', result.user.email);
+      
       if (!isAdmin(result.user.email)) {
+        console.log('[Admin] Non-admin email, rejecting');
         setError('Only admin can access this panel');
+        isSigningOut.current = true;
         await auth.signOut();
+        isSigningOut.current = false;
         setUser(null);
       } else {
-        // Auth state listener will handle setting user
+        console.log('[Admin] Admin email confirmed');
         setError('');
       }
     } catch (err) {
-      console.error('Google login error:', err);
+      console.error('[Admin] Google login error:', err);
       setError(err.message || 'Login failed');
       setUser(null);
     } finally {
@@ -93,36 +136,37 @@ export default function AdminPanel() {
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
+    console.log('[Admin] Email login initiated');
     setLoading(true);
     setError('');
     
-    // Trim inputs and check admin credentials
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
     
     if (trimmedEmail === ADMIN_EMAIL && trimmedPassword === ADMIN_PASSWORD) {
       try {
-        // Try to sign in first
         await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+        console.log('[Admin] Email login successful');
         setError('');
       } catch (err) {
-        // If user doesn't exist or wrong password, try to create account
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+        console.log('[Admin] Email login failed, trying to create account:', err.code);
+        
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || 
+            err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
           try {
-            // Create new account with admin credentials
             await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+            console.log('[Admin] Account created successfully');
             setError('');
           } catch (createErr) {
-            // If account already exists with different password
+            console.error('[Admin] Account creation failed:', createErr);
             if (createErr.code === 'auth/email-already-in-use') {
-              setError('Account exists but password incorrect. Try Google Sign-In instead or contact admin.');
+              setError('Account exists but password incorrect. Try Google Sign-In instead.');
             } else {
-              console.error('Create user error:', createErr);
               setError(createErr.message || 'Failed to create account');
             }
           }
         } else {
-          console.error('Login error:', err);
+          console.error('[Admin] Login error:', err);
           setError(err.message || 'Login failed');
         }
       }
@@ -317,9 +361,14 @@ export default function AdminPanel() {
           </div>
           <button
             onClick={() => {
-              auth.signOut();
-              setUser(null);
-              removeAdminAccess();
+              console.log('[Admin] Logout initiated');
+              isSigningOut.current = true;
+              auth.signOut().then(() => {
+                console.log('[Admin] Logout complete');
+                isSigningOut.current = false;
+                setUser(null);
+                removeAdminAccess();
+              });
             }}
             className="text-sm text-gray-600 hover:text-gray-900"
           >
