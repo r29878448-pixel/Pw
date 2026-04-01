@@ -26,6 +26,7 @@ export default function AdminPanel() {
   
   const hasLoadedData = useRef(false);
   const authCheckTimeout = useRef(null);
+  const isSigningOut = useRef(false);
   
   // Default batches for editing
   const [defaultBatches] = useState([
@@ -66,7 +67,9 @@ export default function AdminPanel() {
             // Load API URL from Firebase
             const url = await getApiUrl();
             setApiUrlState(url || '');
-            const batches = getCustomBatches();
+            
+            // Load custom batches from Firebase
+            const batches = await getCustomBatches();
             setCustomBatches(batches);
             hasLoadedData.current = true;
           } catch (err) {
@@ -152,23 +155,35 @@ export default function AdminPanel() {
     }
   };
 
-  const handleAddBatch = () => {
+  const handleAddBatch = async () => {
     try {
-      addCustomBatch(newBatch);
-      setCustomBatches(getCustomBatches());
+      setLoading(true);
+      await addCustomBatch(newBatch);
+      const batches = await getCustomBatches();
+      setCustomBatches(batches);
       setNewBatch({ batchId: '', batchName: '', batchImage: '', _tag: '' });
       setShowAddBatch(false);
-      alert('✅ Batch added successfully!');
+      alert('✅ Batch added successfully! All users can now see it.');
     } catch (error) {
       alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemoveBatch = (batchId) => {
-    if (confirm('Are you sure you want to remove this batch?')) {
-      removeCustomBatch(batchId);
-      setCustomBatches(getCustomBatches());
-      alert('✅ Batch removed!');
+  const handleRemoveBatch = async (batchId) => {
+    if (confirm('Are you sure you want to remove this batch? It will be removed for all users.')) {
+      try {
+        setLoading(true);
+        await removeCustomBatch(batchId);
+        const batches = await getCustomBatches();
+        setCustomBatches(batches);
+        alert('✅ Batch removed for all users!');
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -185,28 +200,32 @@ export default function AdminPanel() {
     });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     try {
+      setLoading(true);
       saveBatchEdit(editingBatch.batchId, {
         batchName: editingBatch.batchName,
         batchImage: editingBatch.batchImage,
         _tag: editingBatch._tag
       });
       
-      // If it's a custom batch, also update in custom batches
+      // If it's a custom batch, also update in Firebase
       if (editingBatch._isCustom) {
-        updateCustomBatch(editingBatch.batchId, {
+        await updateCustomBatch(editingBatch.batchId, {
           batchName: editingBatch.batchName,
           batchImage: editingBatch.batchImage,
           _tag: editingBatch._tag
         });
-        setCustomBatches(getCustomBatches());
+        const batches = await getCustomBatches();
+        setCustomBatches(batches);
       }
       
       setEditingBatch(null);
       alert('✅ Batch updated successfully!');
     } catch (error) {
       alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
