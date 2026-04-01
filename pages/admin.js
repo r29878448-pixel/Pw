@@ -32,6 +32,14 @@ export default function AdminPanel() {
     { batchId: '67790151518b938bc630052d', batchName: 'Udaan 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
   ]);
 
+  const loadData = () => {
+    const url = getApiUrl();
+    setApiUrlState(url || '');
+    
+    const batches = getCustomBatches();
+    setCustomBatches(batches);
+  };
+
   useEffect(() => {
     let mounted = true;
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -41,7 +49,11 @@ export default function AdminPanel() {
         setUser(currentUser);
         setAdminAccess(ADMIN_EMAIL);
         setError('');
-        loadData();
+        // Load data directly here
+        const url = getApiUrl();
+        setApiUrlState(url || '');
+        const batches = getCustomBatches();
+        setCustomBatches(batches);
       } else if (currentUser) {
         setError('Only admin can access this panel');
         auth.signOut();
@@ -56,14 +68,6 @@ export default function AdminPanel() {
       unsubscribe();
     };
   }, []);
-
-  const loadData = () => {
-    const url = getApiUrl();
-    setApiUrlState(url || '');
-    
-    const batches = getCustomBatches();
-    setCustomBatches(batches);
-  };
 
   const handleGoogleLogin = async () => {
     setLoading(true);
