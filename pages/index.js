@@ -435,11 +435,16 @@ function TopicsView({ batchId, subject, trail }) {
 
 // ─── Subjects View ────────────────────────────────────────────────────────────
 
-function SubjectsView({ batchId, batch, subjects, trail }) {
+function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
   const [sel, setSel] = useState(null);
 
   const batchTitle = batch?.batchName || batch?.name || `Batch ${batchId}`;
   const batchThumb = batch?.batchImage || batch?.image || batch?.thumbnail;
+  
+  // Filter live classes by status
+  const liveNow = liveClasses.filter(c => c.tag === 'live' || c.status === 'live');
+  const upcoming = liveClasses.filter(c => c.tag === 'upcoming' || c.status === 'upcoming');
+  const ended = liveClasses.filter(c => c.tag === 'ended' || c.status === 'ended');
 
   if (sel) {
     return (
@@ -467,6 +472,103 @@ function SubjectsView({ batchId, batch, subjects, trail }) {
           <h2 className="text-2xl font-bold leading-tight">{batchTitle}</h2>
           <p className="text-xs text-orange-200 mt-1 font-mono opacity-60">ID: {batchId}</p>
         </div>
+      </div>
+
+      {/* Today's Classes Section */}
+      <div className="mb-6">
+        <p className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
+          <span className="text-lg">📺</span> Today's Classes
+        </p>
+        
+        {liveClasses.length === 0 ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+            <div className="text-4xl mb-3">📭</div>
+            <p className="text-gray-600 text-sm">No live classes scheduled for today.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Live Now */}
+            {liveNow.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-red-600 uppercase mb-2 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
+                  Live Now
+                </p>
+                <div className="space-y-2">
+                  {liveNow.map((cls, idx) => (
+                    <div key={idx} className="bg-red-50 border-2 border-red-500 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
+                          🔴
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Live Class'}</p>
+                          <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs px-2 py-0.5 bg-red-500 text-white rounded-full font-medium">LIVE</span>
+                            {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Upcoming */}
+            {upcoming.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-blue-600 uppercase mb-2">Upcoming</p>
+                <div className="space-y-2">
+                  {upcoming.map((cls, idx) => (
+                    <div key={idx} className="bg-blue-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
+                          ⏰
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Upcoming Class'}</p>
+                          <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full font-medium">UPCOMING</span>
+                            {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Ended */}
+            {ended.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Previous</p>
+                <div className="space-y-2">
+                  {ended.slice(0, 3).map((cls, idx) => (
+                    <div key={idx} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
+                          ✓
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Ended Class'}</p>
+                          <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs px-2 py-0.5 bg-gray-400 text-white rounded-full font-medium">ENDED</span>
+                            {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4">
@@ -621,7 +723,7 @@ function BatchesGrid({ onSelect }) {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [view, setView] = useState({ screen: 'batches', batchId: null, batch: null, subjects: [] });
+  const [view, setView] = useState({ screen: 'batches', batchId: null, batch: null, subjects: [], liveClasses: [] });
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -684,7 +786,7 @@ export default function Home() {
     }
   };
 
-  const goHome = () => setView({ screen: 'batches', batchId: null, batch: null, subjects: [] });
+  const goHome = () => setView({ screen: 'batches', batchId: null, batch: null, subjects: [], liveClasses: [] });
 
   const handleBatchSelect = async (batchId, batch) => {
     if (!user) {
@@ -693,12 +795,25 @@ export default function Home() {
     }
     setLoadingBatch(true);
     let subjects = [];
+    let liveClasses = [];
+    
     try {
+      // Fetch batch details
       const d = await api(`/api/batchdetails?batchId=${batchId}`);
       subjects = d?.data?.subjects || d?.subjects || [];
+      
+      // Fetch live classes
+      try {
+        const liveData = await api(`/api/live?batchId=${batchId}`);
+        liveClasses = liveData?.data || liveData || [];
+        console.log('📺 Live classes:', liveClasses.length);
+      } catch (e) {
+        console.log('No live classes:', e.message);
+      }
     } catch (_) {}
+    
     setLoadingBatch(false);
-    setView({ screen: 'subjects', batchId, batch, subjects });
+    setView({ screen: 'subjects', batchId, batch, subjects, liveClasses });
   };
 
   if (authLoading) {
@@ -854,6 +969,7 @@ export default function Home() {
               batchId={view.batchId}
               batch={view.batch}
               subjects={view.subjects}
+              liveClasses={view.liveClasses || []}
               trail={[{ label: '⚡ PW', fn: goHome }]}
             />
           )}
