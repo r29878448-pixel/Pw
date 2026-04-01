@@ -27,6 +27,7 @@ export default function AdminPanel() {
   // Prevent infinite loop with ref
   const isSigningOut = useRef(false);
   const hasLoadedData = useRef(false);
+  const isCheckingRedirect = useRef(true);
   
   // Default batches for editing
   const [defaultBatches] = useState([
@@ -40,7 +41,6 @@ export default function AdminPanel() {
   useEffect(() => {
     console.log('[Admin] Setting up auth listener');
     let mounted = true;
-    let isCheckingRedirect = true;
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -64,7 +64,8 @@ export default function AdminPanel() {
         }
       })
       .finally(() => {
-        isCheckingRedirect = false;
+        console.log('[Admin] Redirect check complete');
+        isCheckingRedirect.current = false;
       });
     
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -74,8 +75,8 @@ export default function AdminPanel() {
       }
       
       // Skip if still checking redirect
-      if (isCheckingRedirect) {
-        console.log('[Admin] Still checking redirect, skipping...');
+      if (isCheckingRedirect.current) {
+        console.log('[Admin] Still checking redirect, skipping auth state...');
         return;
       }
       

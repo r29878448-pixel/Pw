@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { auth, googleProvider } from '../lib/firebase';
 import { signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
@@ -574,9 +574,11 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  
+  const isCheckingRedirect = useRef(true);
 
   useEffect(() => {
-    let isCheckingRedirect = true;
+    console.log('[Home] Setting up auth');
     
     // Check for redirect result first
     getRedirectResult(auth)
@@ -593,11 +595,13 @@ export default function Home() {
         }
       })
       .finally(() => {
-        isCheckingRedirect = false;
+        console.log('[Home] Redirect check complete');
+        isCheckingRedirect.current = false;
       });
     
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!isCheckingRedirect) {
+      if (!isCheckingRedirect.current) {
+        console.log('[Home] Auth state:', currentUser?.email || 'No user');
         setUser(currentUser);
         setAuthLoading(false);
       }
