@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { auth, googleProvider, ADMIN_EMAIL, ADMIN_PASSWORD, isAdmin } from '../lib/firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getApiUrl, setApiUrl, getCustomBatches, addCustomBatch, removeCustomBatch, updateCustomBatch, getAllBatchesForEdit, saveBatchEdit } from '../lib/apiConfig';
 import { setAdminAccess, removeAdminAccess } from '../lib/devToolsProtection';
 
@@ -102,19 +102,24 @@ export default function AdminPanel() {
     
     if (trimmedEmail === ADMIN_EMAIL && trimmedPassword === ADMIN_PASSWORD) {
       try {
+        // Try to sign in first
         await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
-        // Auth state listener will handle setting user
         setError('');
       } catch (err) {
-        // If user doesn't exist, create account
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        // If user doesn't exist or wrong password, try to create account
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
           try {
+            // Create new account with admin credentials
             await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
-            // Auth state listener will handle setting user
             setError('');
           } catch (createErr) {
-            console.error('Create user error:', createErr);
-            setError(createErr.message || 'Failed to create account');
+            // If account already exists with different password
+            if (createErr.code === 'auth/email-already-in-use') {
+              setError('Account exists but password incorrect. Try Google Sign-In instead or contact admin.');
+            } else {
+              console.error('Create user error:', createErr);
+              setError(createErr.message || 'Failed to create account');
+            }
           }
         } else {
           console.error('Login error:', err);
@@ -122,7 +127,7 @@ export default function AdminPanel() {
         }
       }
     } else {
-      setError('Invalid admin credentials');
+      setError('Invalid admin credentials. Email: adityaghoghari01@gmail.com');
     }
     setLoading(false);
   };
@@ -222,6 +227,10 @@ export default function AdminPanel() {
               {error}
             </div>
           )}
+
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-800 text-xs font-medium">💡 Recommended: Use Google Sign-In with adityaghoghari01@gmail.com</p>
+          </div>
 
           <div className="flex gap-2 mb-6">
             <button
