@@ -495,23 +495,33 @@ function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
                   Live Now
                 </p>
                 <div className="space-y-2">
-                  {liveNow.map((cls, idx) => (
-                    <div key={idx} className="bg-red-50 border-2 border-red-500 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
-                          🔴
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Live Class'}</p>
-                          <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs px-2 py-0.5 bg-red-500 text-white rounded-full font-medium">LIVE</span>
-                            {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                  {liveNow.map((cls, idx) => {
+                    const videoId = cls.videoId || cls._id || cls.id;
+                    const subjectSlug = cls.subjectSlug || cls.subject_slug || '';
+                    const scheduleId = cls.scheduleId || cls._id || cls.id;
+                    const subjectId = cls.subjectId || cls.subject_id || '';
+                    const topicSlug = cls.topicSlug || cls.topic_slug || '';
+                    
+                    const playerUrl = `https://deltastudy.site/pw/aws/play?video_id=${videoId}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&topicSlug=${encodeURIComponent(topicSlug)}`;
+                    
+                    return (
+                      <div key={idx} onClick={() => window.open(playerUrl, '_blank')} className="bg-red-50 border-2 border-red-500 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
+                            🔴
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Live Class'}</p>
+                            <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs px-2 py-0.5 bg-red-500 text-white rounded-full font-medium">LIVE</span>
+                              {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -521,23 +531,33 @@ function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
               <div>
                 <p className="text-xs font-semibold text-blue-600 uppercase mb-2">Upcoming</p>
                 <div className="space-y-2">
-                  {upcoming.map((cls, idx) => (
-                    <div key={idx} className="bg-blue-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
-                          ⏰
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Upcoming Class'}</p>
-                          <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full font-medium">UPCOMING</span>
-                            {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                  {upcoming.map((cls, idx) => {
+                    const videoId = cls.videoId || cls._id || cls.id;
+                    const subjectSlug = cls.subjectSlug || cls.subject_slug || '';
+                    const scheduleId = cls.scheduleId || cls._id || cls.id;
+                    const subjectId = cls.subjectId || cls.subject_id || '';
+                    const topicSlug = cls.topicSlug || cls.topic_slug || '';
+                    
+                    const playerUrl = `https://deltastudy.site/pw/aws/play?video_id=${videoId}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&topicSlug=${encodeURIComponent(topicSlug)}`;
+                    
+                    return (
+                      <div key={idx} onClick={() => window.open(playerUrl, '_blank')} className="bg-blue-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
+                            ⏰
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Upcoming Class'}</p>
+                            <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full font-medium">UPCOMING</span>
+                              {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -547,23 +567,33 @@ function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Previous</p>
                 <div className="space-y-2">
-                  {ended.slice(0, 3).map((cls, idx) => (
-                    <div key={idx} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
-                          ✓
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Ended Class'}</p>
-                          <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs px-2 py-0.5 bg-gray-400 text-white rounded-full font-medium">ENDED</span>
-                            {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                  {ended.slice(0, 3).map((cls, idx) => {
+                    const videoId = cls.videoId || cls._id || cls.id;
+                    const subjectSlug = cls.subjectSlug || cls.subject_slug || '';
+                    const scheduleId = cls.scheduleId || cls._id || cls.id;
+                    const subjectId = cls.subjectId || cls.subject_id || '';
+                    const topicSlug = cls.topicSlug || cls.topic_slug || '';
+                    
+                    const playerUrl = `https://deltastudy.site/pw/aws/play?video_id=${videoId}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&topicSlug=${encodeURIComponent(topicSlug)}`;
+                    
+                    return (
+                      <div key={idx} onClick={() => window.open(playerUrl, '_blank')} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
+                            ✓
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Ended Class'}</p>
+                            <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs px-2 py-0.5 bg-gray-400 text-white rounded-full font-medium">ENDED</span>
+                              {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
