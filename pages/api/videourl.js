@@ -3,9 +3,7 @@
  * Tries 4 fallback APIs to get a playable video URL
  */
 const { safeDecrypt } = require('../../lib/decrypt');
-
-// Use default API URL directly in API routes (server-side)
-const DEFAULT_API_URL = 'https://adc.onrender.app';
+const { getApiUrlFromFirebase } = require('../../lib/firebaseAdmin');
 
 async function tryFetch(url) {
   try {
@@ -33,8 +31,7 @@ function extractUrl(data) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
-  // Use default API URL for server-side requests
-  const PW = DEFAULT_API_URL;
+  const PW = await getApiUrlFromFirebase();
   
   const { batchId, subjectId, findKey } = req.query;
   if (!batchId || !findKey) return res.status(400).json({ error: 'batchId, findKey required' });

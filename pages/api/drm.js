@@ -7,9 +7,7 @@
  * 4. Return { mpdUrl, kid, key } for Shaka clearKeys
  */
 const { safeDecrypt } = require('../../lib/decrypt');
-
-// Use default API URL directly in API routes (server-side)
-const DEFAULT_API_URL = 'https://adc.onrender.app';
+const { getApiUrlFromFirebase } = require('../../lib/firebaseAdmin');
 
 async function fetchText(url) {
   const r = await fetch(url, {
@@ -38,8 +36,7 @@ function extractKid(mpdXml) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
-  // Use default API URL for server-side requests
-  const PW = DEFAULT_API_URL;
+  const PW = await getApiUrlFromFirebase();
   
   const { findKey, batchId, subjectId, mpdUrl } = req.query;
 
