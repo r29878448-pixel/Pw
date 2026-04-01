@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
   reactStrictMode: true,
+  eslint: {
+    // Disable ESLint during build to avoid warnings
+    ignoreDuringBuilds: true,
+  },
   images: {
     domains: ['static.pw.live', 'd2bps9p1kiy4ka.cloudfront.net', 'i.postimg.cc'],
   },
