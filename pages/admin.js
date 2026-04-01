@@ -45,7 +45,7 @@ export default function AdminPanel() {
       setAuthLoading(false);
     }, 3000);
     
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       console.log('[Admin] Auth state:', currentUser?.email || 'No user');
       
       if (authCheckTimeout.current) {
@@ -63,7 +63,8 @@ export default function AdminPanel() {
         
         if (!hasLoadedData.current) {
           try {
-            const url = getApiUrl();
+            // Load API URL from Firebase
+            const url = await getApiUrl();
             setApiUrlState(url || '');
             const batches = getCustomBatches();
             setCustomBatches(batches);
@@ -139,12 +140,15 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  const handleSaveApiUrl = () => {
+  const handleSaveApiUrl = async () => {
     try {
-      setApiUrl(apiUrl);
-      alert('✅ API URL saved successfully!');
+      setLoading(true);
+      await setApiUrl(apiUrl);
+      alert('✅ API URL saved to Firebase successfully!');
     } catch (error) {
       alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -364,9 +368,10 @@ export default function AdminPanel() {
 
             <button
               onClick={handleSaveApiUrl}
-              className="bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 transition"
+              disabled={loading}
+              className="bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50"
             >
-              Save API URL
+              {loading ? 'Saving...' : 'Save API URL to Firebase'}
             </button>
           </div>
 

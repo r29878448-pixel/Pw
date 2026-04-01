@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Config collection - only admin can write, everyone can read
+    match /config/{document=**} {
+      allow read: if true;  // Anyone can read config
+      allow write: if request.auth != null && request.auth.token.email == 'adityaghoghari01@gmail.com';  // Only admin can write
+    }
+    
+    // Default rule - deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
