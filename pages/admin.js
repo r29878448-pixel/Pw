@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider, ADMIN_EMAIL, ADMIN_PASSWORD, isAdmin } from '../lib/firebase';
-import { signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getApiUrl, setApiUrl, getCustomBatches, addCustomBatch, removeCustomBatch, updateCustomBatch, getAllBatchesForEdit, saveBatchEdit } from '../lib/apiConfig';
 import { setAdminAccess, removeAdminAccess } from '../lib/devToolsProtection';
 
@@ -9,7 +9,7 @@ export default function AdminPanel() {
   const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginMode, setLoginMode] = useState('google'); // 'email' or 'google'
+  const [loginMode, setLoginMode] = useState('google');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -24,10 +24,7 @@ export default function AdminPanel() {
     _tag: ''
   });
   
-  // Prevent infinite loop with ref
-  const isSigningOut = useRef(false);
   const hasLoadedData = useRef(false);
-  const isCheckingRedirect = useRef(true);
   const authCheckTimeout = useRef(null);
   
   // Default batches for editing
@@ -38,80 +35,30 @@ export default function AdminPanel() {
     { batchId: '67790151518b938bc630052d', batchName: 'Udaan 2027 (Class 10th)', batchImage: 'https://static.pw.live/5eb393ee95fab7468a79d189/ADMIN/udaan-2027.png', _tag: '10th' },
   ]);
 
+  // Simple auth check - runs ONCE
   useEffect(() => {
-    console.log('[Admin] Setting up auth listener');
-    let mounted = true;
+    console.log('[Admin] Setting up auth');
     
-    // Immediate fallback - force stop loading after 2 seconds
+    // Timeout fallback
     authCheckTimeout.current = setTimeout(() => {
-      console.log('[Admin] ⚠️ Auth check timeout (2s) - forcing stop loading');
-      isCheckingRedirect.current = false;
+      console.log('[Admin] Timeout - stopping loading');
       setAuthLoading(false);
-    }, 2000);
-    
-    // Check for redirect result first
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          console.log('[Admin] Redirect result:', result.user.email);
-          if (!isAdmin(result.user.email)) {
-            console.log('[Admin] Non-admin from redirect, signing out');
-            setError('Only admin can access this panel');
-            isSigningOut.current = true;
-            return auth.signOut().then(() => {
-              isSigningOut.current = false;
-            });
-          }
-        }
-      })
-      .catch((error) => {
-        console.error('[Admin] Redirect error:', error);
-        if (error.code !== 'auth/popup-closed-by-user') {
-          setError(error.message || 'Login failed');
-        }
-      })
-      .finally(() => {
-        console.log('[Admin] Redirect check complete');
-        isCheckingRedirect.current = false;
-        if (authCheckTimeout.current) {
-          clearTimeout(authCheckTimeout.current);
-        }
-      });
+    }, 3000);
     
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      if (!mounted) {
-        console.log('[Admin] Component unmounted, ignoring auth change');
-        return;
-      }
+      console.log('[Admin] Auth state:', currentUser?.email || 'No user');
       
-      console.log('[Admin] Auth state changed:', {
-        user: currentUser?.email,
-        isAdmin: currentUser ? isAdmin(currentUser.email) : false,
-        isSigningOut: isSigningOut.current
-      });
-      
-      // Always stop loading on auth state change
-      setAuthLoading(false);
-      isCheckingRedirect.current = false;
       if (authCheckTimeout.current) {
         clearTimeout(authCheckTimeout.current);
       }
       
-      // If we're in the process of signing out, don't process
-      if (isSigningOut.current) {
-        console.log('[Admin] Currently signing out, skipping...');
-        return;
-      }
-      
       if (currentUser && isAdmin(currentUser.email)) {
-        console.log('[Admin] ✅ Admin user authenticated');
+        console.log('[Admin] ✅ Admin authenticated');
         setUser(currentUser);
         setAdminAccess(ADMIN_EMAIL);
         setError('');
         
-        // Load data only once
         if (!hasLoadedData.current) {
-          console.log('[Admin] Loading data...');
           try {
             const url = getApiUrl();
             setApiUrlState(url || '');
@@ -119,57 +66,48 @@ export default function AdminPanel() {
             setCustomBatches(batches);
             hasLoadedData.current = true;
           } catch (err) {
-            console.error('[Admin] Error loading data:', err);
+            console.error('[Admin] Load error:', err);
           }
         }
       } else if (currentUser) {
-        console.log('[Admin] ❌ Non-admin user detected, signing out...');
+        console.log('[Admin] ❌ Non-admin user');
         setError('Only admin can access this panel');
-        isSigningOut.current = true;
-        
-        auth.signOut().then(() => {
-          console.log('[Admin] Sign out complete');
-          isSigningOut.current = false;
-          setUser(null);
-        }).catch((err) => {
-          console.error('[Admin] Sign out error:', err);
-          isSigningOut.current = false;
-        });
+        auth.signOut();
+        setUser(null);
       } else {
-        console.log('[Admin] No user logged in');
         setUser(null);
       }
+      
+      setAuthLoading(false);
     });
     
     return () => {
-      console.log('[Admin] Cleaning up auth listener');
-      mounted = false;
-      if (authCheckTimeout.current) {
-        clearTimeout(authCheckTimeout.current);
-      }
+      if (authCheckTimeout.current) clearTimeout(authCheckTimeout.current);
       unsubscribe();
     };
-  }, []); // Empty dependency array - runs ONCE
+  }, []);
 
   const handleGoogleLogin = async () => {
-    console.log('[Admin] Google login initiated (redirect method)');
+    console.log('[Admin] Google login');
     setLoading(true);
     setError('');
     
     try {
-      // Use redirect instead of popup to avoid COOP issues
-      await signInWithRedirect(auth, googleProvider);
-      // User will be redirected, no need to handle result here
+      const result = await signInWithPopup(auth, googleProvider);
+      if (!isAdmin(result.user.email)) {
+        setError('Only admin can access');
+        await auth.signOut();
+      }
     } catch (err) {
-      console.error('[Admin] Google login error:', err);
+      console.error('[Admin] Login error:', err);
       setError(err.message || 'Login failed');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
-    console.log('[Admin] Email login initiated');
     setLoading(true);
     setError('');
     
@@ -179,32 +117,19 @@ export default function AdminPanel() {
     if (trimmedEmail === ADMIN_EMAIL && trimmedPassword === ADMIN_PASSWORD) {
       try {
         await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
-        console.log('[Admin] Email login successful');
-        setError('');
       } catch (err) {
-        console.log('[Admin] Email login failed, trying to create account:', err.code);
-        
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || 
-            err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
           try {
             await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
-            console.log('[Admin] Account created successfully');
-            setError('');
           } catch (createErr) {
-            console.error('[Admin] Account creation failed:', createErr);
-            if (createErr.code === 'auth/email-already-in-use') {
-              setError('Account exists but password incorrect. Try Google Sign-In instead.');
-            } else {
-              setError(createErr.message || 'Failed to create account');
-            }
+            setError(createErr.code === 'auth/email-already-in-use' ? 'Try Google Sign-In' : createErr.message);
           }
         } else {
-          console.error('[Admin] Login error:', err);
-          setError(err.message || 'Login failed');
+          setError(err.message);
         }
       }
     } else {
-      setError('Invalid admin credentials. Email: adityaghoghari01@gmail.com');
+      setError('Invalid credentials');
     }
     setLoading(false);
   };

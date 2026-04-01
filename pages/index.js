@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { auth, googleProvider } from '../lib/firebase';
-import { signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -575,55 +575,25 @@ export default function Home() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   
-  const isCheckingRedirect = useRef(true);
   const authCheckTimeout = useRef(null);
 
   useEffect(() => {
     console.log('[Home] Setting up auth');
     
-    // Immediate fallback - set loading false after 2 seconds max
     authCheckTimeout.current = setTimeout(() => {
-      console.log('[Home] ⚠️ Auth check timeout (2s) - forcing stop loading');
-      isCheckingRedirect.current = false;
+      console.log('[Home] Timeout - stopping loading');
       setAuthLoading(false);
-    }, 2000);
-    
-    // Check for redirect result first
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          console.log('[Home] User logged in via redirect:', result.user.email);
-          setShowLoginModal(false);
-        }
-      })
-      .catch((error) => {
-        console.error('[Home] Redirect error:', error);
-        if (error.code !== 'auth/popup-closed-by-user') {
-          setLoginError(error.message || 'Login failed');
-        }
-      })
-      .finally(() => {
-        console.log('[Home] Redirect check complete');
-        isCheckingRedirect.current = false;
-        if (authCheckTimeout.current) {
-          clearTimeout(authCheckTimeout.current);
-        }
-      });
+    }, 3000);
     
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       console.log('[Home] Auth state:', currentUser?.email || 'No user');
+      if (authCheckTimeout.current) clearTimeout(authCheckTimeout.current);
       setUser(currentUser);
       setAuthLoading(false);
-      isCheckingRedirect.current = false;
-      if (authCheckTimeout.current) {
-        clearTimeout(authCheckTimeout.current);
-      }
     });
     
     return () => {
-      if (authCheckTimeout.current) {
-        clearTimeout(authCheckTimeout.current);
-      }
+      if (authCheckTimeout.current) clearTimeout(authCheckTimeout.current);
       unsubscribe();
     };
   }, []);
@@ -631,8 +601,8 @@ export default function Home() {
   const handleGoogleLogin = async () => {
     setLoginError('');
     try {
-      // Use redirect instead of popup
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
+      setShowLoginModal(false);
     } catch (err) {
       setLoginError(err.message || 'Login failed');
     }
