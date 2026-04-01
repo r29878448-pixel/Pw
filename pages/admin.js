@@ -74,15 +74,18 @@ export default function AdminPanel() {
     setLoading(true);
     setError('');
     
-    // Check admin credentials
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    // Trim inputs and check admin credentials
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    
+    if (trimmedEmail === ADMIN_EMAIL && trimmedPassword === ADMIN_PASSWORD) {
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
       } catch (err) {
         // If user doesn't exist, create account
-        if (err.code === 'auth/user-not-found') {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
           try {
-            await createUserWithEmailAndPassword(auth, email, password);
+            await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
           } catch (createErr) {
             setError(createErr.message);
           }
