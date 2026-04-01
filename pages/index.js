@@ -698,10 +698,14 @@ function BatchesGrid({ onSelect }) {
                   <img 
                     src={thumbnail} 
                     alt={batch.batchName}
+                    crossOrigin="anonymous"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    onLoad={() => console.log('✅ Image loaded:', thumbnail)}
                     onError={(e) => {
+                      console.error('❌ Image failed:', thumbnail);
                       e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'flex';
+                      const fallback = e.target.nextElementSibling;
+                      if (fallback) fallback.style.display = 'flex';
                     }}
                   />
                   {/* Fallback icon if image fails */}
@@ -719,7 +723,7 @@ function BatchesGrid({ onSelect }) {
                 </div>
               ) : (
                 // No thumbnail - show gradient with icon
-                <div className={`relative h-40 bg-gradient-to-br ${tagColors[idx]} flex items-center justify-center`}>
+                <div className={`relative h-40 bg-gradient-to-br ${tagColors[idx % tagColors.length]} flex items-center justify-center`}>
                   <span className="text-6xl">
                     {batch._custom ? '⭐' : idx === 0 ? '🔬' : idx === 1 ? '🧬' : idx === 2 ? '📚' : '📖'}
                   </span>
