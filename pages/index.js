@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { auth, googleProvider } from '../lib/firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
@@ -195,6 +196,7 @@ function NoteItem({ item, batchId, subjectId, tabColor }) {
 // ─── Content View ─────────────────────────────────────────────────────────────
 
 function ContentView({ batchId, subjectSlug, subjectId, topic, trail }) {
+  const router = useRouter();
   const [tab, setTab] = useState('videos');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -277,11 +279,11 @@ function ContentView({ batchId, subjectSlug, subjectId, topic, trail }) {
               const findKey = vd.findKey || item._id || '';
               const scheduleId = item._id || findKey;
               const actualTopicSlug = item._actualTopicSlug || topicSlug;
-              const playerUrl = `https://deltastudy.site/pw/drm/play?video_id=${findKey}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId || '')}&topicSlug=${encodeURIComponent(actualTopicSlug)}`;
+              const playerUrl = `/player?video_id=${findKey}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId || '')}&topicSlug=${encodeURIComponent(actualTopicSlug)}&title=${encodeURIComponent(title)}`;
 
               return (
                 <div key={item._id || idx}
-                  onClick={() => window.open(playerUrl, '_blank')}
+                  onClick={() => router.push(playerUrl)}
                   className="bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all overflow-hidden cursor-pointer">
                   <div className="flex items-center gap-3 p-3 group">
                     {thumb ? (
@@ -436,15 +438,32 @@ function TopicsView({ batchId, subject, trail }) {
 // ─── Subjects View ────────────────────────────────────────────────────────────
 
 function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
+  const router = useRouter();
   const [sel, setSel] = useState(null);
 
   const batchTitle = batch?.batchName || batch?.name || `Batch ${batchId}`;
   const batchThumb = batch?.batchImage || batch?.image || batch?.thumbnail;
-  
-  // Filter live classes by status
-  const liveNow = liveClasses.filter(c => c.tag === 'live' || c.status === 'live');
-  const upcoming = liveClasses.filter(c => c.tag === 'upcoming' || c.status === 'upcoming');
-  const ended = liveClasses.filter(c => c.tag === 'ended' || c.status === 'ended');
+
+  // Parse classes per spec
+  const getStatus = (cls) => {
+    const topic = (cls.topic || '').toLowerCase();
+    if (topic.includes('cancelled')) return 'cancelled';
+    if (cls.tag === 'live' || cls.status === 'live') return 'live';
+    if (cls.tag === 'ended' || cls.status === 'ended' || topic.includes('recorded')) return 'ended';
+    if (cls.tag === 'upcoming' || cls.status === 'upcoming') return 'upcoming';
+    return 'upcoming';
+  };
+
+  const getTeacher = (cls) => cls.teachers?.[0]?.name || cls.teacher || '';
+  const getThumb = (cls) => cls.videoDetails?.image || cls.thumbnail || cls.image || '';
+  const getFindKey = (cls) => cls.videoDetails?.findKey || cls.videoId || cls._id || '';
+  const getSubjectName = (cls) => cls.subjectId?.name || cls.subject || '';
+  const getTime = (cls) => {
+    if (!cls.startTime) return '';
+    try {
+      return new Date(cls.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } catch (_) { return ''; }
+  };
 
   if (sel) {
     return (
@@ -460,6 +479,7 @@ function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
     <div>
       <Crumb trail={[...trail, { label: batchTitle }]} />
 
+      {/* Batch header */}
       <div className="relative rounded-2xl overflow-hidden mb-6 bg-gradient-to-r from-orange-500 to-red-600 p-5 text-white shadow-lg min-h-[100px]">
         {batchThumb && (
           <img src={batchThumb} alt={batchTitle}
@@ -474,129 +494,79 @@ function SubjectsView({ batchId, batch, subjects, trail, liveClasses = [] }) {
         </div>
       </div>
 
-      {/* Today's Classes Section */}
+      {/* Today's Live Classes */}
       <div className="mb-6">
-        <p className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-          <span className="text-lg">📺</span> Today's Classes
+        <p className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
+          Today's Classes
         </p>
-        
+
         {liveClasses.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-            <div className="text-4xl mb-3">📭</div>
-            <p className="text-gray-600 text-sm">No live classes scheduled for today.</p>
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 text-center">
+            <div className="text-3xl mb-2">📭</div>
+            <p className="text-gray-500 text-sm">No live classes today</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Live Now */}
-            {liveNow.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-red-600 uppercase mb-2 flex items-center gap-1">
-                  <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
-                  Live Now
-                </p>
-                <div className="space-y-2">
-                  {liveNow.map((cls, idx) => {
-                    const videoId = cls.videoId || cls._id || cls.id;
-                    const subjectSlug = cls.subjectSlug || cls.subject_slug || '';
-                    const scheduleId = cls.scheduleId || cls._id || cls.id;
-                    const subjectId = cls.subjectId || cls.subject_id || '';
-                    const topicSlug = cls.topicSlug || cls.topic_slug || '';
-                    
-                    const playerUrl = `https://deltastudy.site/pw/aws/play?video_id=${videoId}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&topicSlug=${encodeURIComponent(topicSlug)}`;
-                    
-                    return (
-                      <div key={idx} onClick={() => window.open(playerUrl, '_blank')} className="bg-red-50 border-2 border-red-500 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
-                        <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
-                            🔴
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Live Class'}</p>
-                            <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs px-2 py-0.5 bg-red-500 text-white rounded-full font-medium">LIVE</span>
-                              {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+          <div className="space-y-2">
+            {liveClasses.map((cls, idx) => {
+              const status = getStatus(cls);
+              const cancelled = status === 'cancelled';
+              const findKey = getFindKey(cls);
+              const subjectId = cls.subjectId?._id || cls.subjectId || '';
+              const scheduleId = cls._id || '';
+              const teacher = getTeacher(cls);
+              const thumb = getThumb(cls);
+              const time = getTime(cls);
+              const subject = getSubjectName(cls);
+
+              const handleClick = () => {
+                if (cancelled) return;
+                if (status === 'live' || status === 'upcoming') {
+                  router.push(`/live-player?batch_id=${batchId}&schedule_id=${scheduleId}&video_id=${findKey}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Live Class')}`);
+                } else {
+                  // ended → recorded player
+                  router.push(`/player?video_id=${findKey}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Class Recording')}`);
+                }
+              };
+
+              const statusConfig = {
+                live:      { bg: 'bg-red-50 border-red-300',    dot: 'bg-red-500 animate-pulse', label: '🔴 LIVE',      labelCls: 'bg-red-500 text-white' },
+                upcoming:  { bg: 'bg-blue-50 border-blue-200',  dot: 'bg-blue-400',              label: '⏰ UPCOMING',  labelCls: 'bg-blue-500 text-white' },
+                ended:     { bg: 'bg-gray-50 border-gray-200',  dot: 'bg-green-500',             label: '▶ RECORDED',  labelCls: 'bg-gray-500 text-white' },
+                cancelled: { bg: 'bg-gray-50 border-gray-100',  dot: 'bg-gray-300',              label: '✕ CANCELLED', labelCls: 'bg-gray-300 text-gray-600' },
+              };
+              const sc = statusConfig[status] || statusConfig.upcoming;
+
+              return (
+                <div key={cls._id || idx}
+                  onClick={handleClick}
+                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${sc.bg} ${cancelled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md active:scale-[0.99]'}`}>
+                  {/* Thumbnail */}
+                  <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-200">
+                    {thumb
+                      ? <img src={thumb} alt={cls.topic} className="w-full h-full object-cover" onError={e => { e.target.style.display='none'; }} />
+                      : <div className="w-full h-full flex items-center justify-center text-2xl bg-gradient-to-br from-orange-400 to-red-500">📺</div>
+                    }
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate leading-snug">{cls.topic || 'Class'}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {subject && <span className="text-xs text-gray-500 truncate">{subject}</span>}
+                      {teacher && <span className="text-xs text-gray-400">• {teacher}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${sc.labelCls}`}>{sc.label}</span>
+                      {time && <span className="text-[10px] text-gray-400">{time}</span>}
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  {!cancelled && <span className="text-gray-300 text-lg flex-shrink-0">›</span>}
                 </div>
-              </div>
-            )}
-            
-            {/* Upcoming */}
-            {upcoming.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-blue-600 uppercase mb-2">Upcoming</p>
-                <div className="space-y-2">
-                  {upcoming.map((cls, idx) => {
-                    const videoId = cls.videoId || cls._id || cls.id;
-                    const subjectSlug = cls.subjectSlug || cls.subject_slug || '';
-                    const scheduleId = cls.scheduleId || cls._id || cls.id;
-                    const subjectId = cls.subjectId || cls.subject_id || '';
-                    const topicSlug = cls.topicSlug || cls.topic_slug || '';
-                    
-                    const playerUrl = `https://deltastudy.site/pw/aws/play?video_id=${videoId}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&topicSlug=${encodeURIComponent(topicSlug)}`;
-                    
-                    return (
-                      <div key={idx} onClick={() => window.open(playerUrl, '_blank')} className="bg-blue-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
-                        <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
-                            ⏰
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Upcoming Class'}</p>
-                            <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full font-medium">UPCOMING</span>
-                              {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
-            {/* Ended */}
-            {ended.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Previous</p>
-                <div className="space-y-2">
-                  {ended.slice(0, 3).map((cls, idx) => {
-                    const videoId = cls.videoId || cls._id || cls.id;
-                    const subjectSlug = cls.subjectSlug || cls.subject_slug || '';
-                    const scheduleId = cls.scheduleId || cls._id || cls.id;
-                    const subjectId = cls.subjectId || cls.subject_id || '';
-                    const topicSlug = cls.topicSlug || cls.topic_slug || '';
-                    
-                    const playerUrl = `https://deltastudy.site/pw/aws/play?video_id=${videoId}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&topicSlug=${encodeURIComponent(topicSlug)}`;
-                    
-                    return (
-                      <div key={idx} onClick={() => window.open(playerUrl, '_blank')} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer">
-                        <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center text-white text-xl flex-shrink-0">
-                            ✓
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm line-clamp-1">{cls.topic || cls.title || 'Ended Class'}</p>
-                            <p className="text-xs text-gray-600 mt-1">{cls.subject || 'Subject'}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs px-2 py-0.5 bg-gray-400 text-white rounded-full font-medium">ENDED</span>
-                              {cls.time && <span className="text-xs text-gray-500">{cls.time}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         )}
       </div>
@@ -851,7 +821,9 @@ export default function Home() {
       // Fetch live classes
       try {
         const liveData = await api(`/api/live?batchId=${batchId}`);
-        liveClasses = liveData?.data || liveData || [];
+        // Handle { data: [...] } or direct array
+        const raw = liveData?.data || liveData || [];
+        liveClasses = Array.isArray(raw) ? raw : [];
         console.log('📺 Live classes:', liveClasses.length);
       } catch (e) {
         console.log('No live classes:', e.message);

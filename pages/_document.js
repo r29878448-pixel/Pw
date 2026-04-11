@@ -9,43 +9,48 @@ export default function Document() {
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                // Check admin
+                // Skip ALL protection in dev mode
+                if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+
                 const isAdmin = () => {
-                  try {
-                    return localStorage.getItem('pw_admin_access') === 'adityaghoghari01@gmail.com';
-                  } catch { return false; }
+                  try { return localStorage.getItem('pw_admin_access') === 'adityaghoghari01@gmail.com'; }
+                  catch { return false; }
                 };
-                
                 if (isAdmin()) return;
-                
-                // Block DevTools
+
+                // Block DevTools — redirect instead of nuking DOM
+                let blocked = false;
                 const block = () => {
-                  document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-family:sans-serif;color:white;text-align:center;padding:20px"><div style="font-size:80px;margin-bottom:20px">👊</div><h1 style="font-size:48px;margin:0 0 20px 0;font-weight:bold">चालाकी मत कर!</h1><h2 style="font-size:32px;margin:0 0 30px 0">तेरा बाप हूं मैं!</h2><p style="font-size:18px;opacity:0.9;max-width:500px">DevTools detect ho gaya hai. Ye site inspect nahi kar sakte.</p><button onclick="window.location.reload()" style="margin-top:30px;padding:15px 40px;font-size:18px;background:white;color:#667eea;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.2)">🔄 Reload Page</button></div>';
-                  throw new Error('Blocked');
+                  if (blocked) return;
+                  blocked = true;
+                  window.location.replace('about:blank');
                 };
-                
-                // Disable shortcuts
+
+                // Disable inspect shortcuts
                 document.addEventListener('keydown', (e) => {
-                  if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && [73,74,67].includes(e.keyCode)) || (e.ctrlKey && [85,83].includes(e.keyCode))) {
+                  if (e.keyCode === 123 ||
+                      (e.ctrlKey && e.shiftKey && [73, 74, 67].includes(e.keyCode)) ||
+                      (e.ctrlKey && [85].includes(e.keyCode))) {
                     e.preventDefault();
                     block();
-                    return false;
                   }
                 });
-                
+
                 // Disable right-click
-                document.addEventListener('contextmenu', (e) => {
-                  e.preventDefault();
-                  return false;
-                });
-                
-                // Detect DevTools
+                document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                // Detect DevTools via size (production only, 2s debounce)
+                let dtTimer = null;
                 setInterval(() => {
                   const threshold = 160;
-                  if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
-                    block();
+                  if (window.outerWidth - window.innerWidth > threshold ||
+                      window.outerHeight - window.innerHeight > threshold) {
+                    if (!dtTimer) dtTimer = setTimeout(block, 2000);
+                  } else {
+                    clearTimeout(dtTimer);
+                    dtTimer = null;
                   }
-                }, 100);
+                }, 500);
               })();
             `,
           }}
