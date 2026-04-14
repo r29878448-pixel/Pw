@@ -607,7 +607,7 @@ export default function LivePlayer() {
 
             </div>
           </div>
-        </div>
+       </div>
       </div>
     </>
   );
