@@ -3,9 +3,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { motion, AnimatePresence } from 'framer-motion';
-import { safeDecrypt } from '../lib/decryptBrowser';
-
-const API_BASE = 'https://apiserver-henna.vercel.app';
 
 const getYtId = (url) => url?.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] || null;
 const fmt = (s) => {
@@ -181,7 +178,7 @@ function LiveControls({ videoRef, playerRef, qualities, curQuality, onQuality, l
 
 export default function LivePlayer() {
   const router = useRouter();
-  const { video_id, batch_id, subject_id, subject_slug, schedule_id, title, url: qUrl } = router.query;
+  const { video_id, batch_id, subject_id, schedule_id, title, url: qUrl } = router.query;
 
   const videoRef   = useRef(null);
   const playerRef  = useRef(null);
@@ -252,70 +249,27 @@ export default function LivePlayer() {
     (async () => {
       let url = null;
 
-      // 1. get-url
-      step('Fetching stream details...', 25);
+      // Route through our own Next.js API (server-side) to avoid CORS
+      step('Fetching stream details...', 40);
       try {
         const r = await fetch(
-          `${API_BASE}/api/pw/get-url?batchId=${batch_id}&childId=${vid}&subjectId=${subject_id || ''}`
+          `/api/videourl?batchId=${batch_id}&subjectId=${subject_id || ''}&findKey=${vid}`
         );
         if (r.ok) {
           const json = await r.json();
-          if (json.success && Array.isArray(json.data) && json.data[0]?.url) {
-            url = json.data[0].url;
+          if (json.url) {
+            if (json.url.includes('youtube.com') || json.url.includes('youtu.be')) {
+              if (mountedRef.current) {
+                setYoutubeUrl(json.url);
+                setPhase('ready');
+                setLoadPct(100);
+              }
+              return;
+            }
+            url = json.url;
           }
         }
       } catch (_) {}
-
-      // 2. video (encrypted)
-      if (!url) {
-        step('Trying alternate source...', 45);
-        try {
-          const r = await fetch(
-            `${API_BASE}/api/pw/video?batchId=${batch_id}&subjectId=${subject_slug || subject_id || ''}&childId=${vid}`
-          );
-          if (r.ok) {
-            const json = await r.json();
-            if (json.data) {
-              const dec = await safeDecrypt(json.data);
-              if (dec && dec.url) {
-                if (dec.url.includes('youtube.com') || dec.url.includes('youtu.be')) {
-                  if (mountedRef.current) {
-                    setYoutubeUrl(dec.url);
-                    setPhase('ready');
-                    setLoadPct(100);
-                  }
-                  return;
-                }
-                url = dec.signedUrl ? dec.url + dec.signedUrl : dec.url;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      // 3. videoplay
-      if (!url) {
-        step('Trying fallback source...', 65);
-        try {
-          const r = await fetch(
-            `${API_BASE}/api/pw/videoplay?batchId=${batch_id}&subjectId=${subject_id || ''}&childId=${vid}`
-          );
-          if (r.ok) {
-            const json = await r.json();
-            if (json.success && json.data?.url) {
-              if (json.data.type === 'youtube') {
-                if (mountedRef.current) {
-                  setYoutubeUrl(json.data.url);
-                  setPhase('ready');
-                  setLoadPct(100);
-                }
-                return;
-              }
-              url = json.data.url;
-            }
-          }
-        } catch (_) {}
-      }
 
       if (!mountedRef.current) return;
 
@@ -329,7 +283,7 @@ export default function LivePlayer() {
       setStreamUrl(url);
       setPhase('loading');
     })();
-  }, [router.isReady, qUrl, batch_id, video_id, schedule_id, subject_id, subject_slug, retryKey]);
+  }, [router.isReady, qUrl, batch_id, video_id, schedule_id, subject_id, retryKey]);
 
   function scheduleRetry(seconds) {
     clearInterval(retryTimer.current);
