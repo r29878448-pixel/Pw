@@ -31,3 +31,13 @@ export default function LivePlayer() {
     </div>
   );
 }
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-white text-center">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-sm">Redirecting to player...</p>
+      </div>
+    </div>
+  );
+}
