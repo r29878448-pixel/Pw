@@ -42,7 +42,49 @@ export default async function handler(req, res) {
       return res.send(text);
     }
 
-    // MPD and everything else — pipe through
+    // MPD — handle URLPrefix parameter (PW specific)
+    if (targetUrl.includes('.mpd') || ct.includes('dash+xml')) {
+      let text = await r.text();
+      
+      // Extract URLPrefix from query params
+      try {
+        const urlObj = new URL(targetUrl);
+        const urlPrefix = urlObj.searchParams.get('URLPrefix');
+        
+        if (urlPrefix) {
+          // Decode base64 URLPrefix
+          const decodedPrefix = Buffer.from(urlPrefix, 'base64').toString('utf-8');
+          console.log('🔧 MPD URLPrefix decoded:', decodedPrefix);
+          
+          // Replace BaseURL in MPD with decoded prefix
+          text = text.replace(/<BaseURL>([^<]+)<\/BaseURL>/g, (match, url) => {
+            // If BaseURL is relative, prepend the decoded prefix
+            if (!url.startsWith('http')) {
+              const newUrl = decodedPrefix.endsWith('/') ? decodedPrefix + url : decodedPrefix + '/' + url;
+              console.log('🔧 Rewriting BaseURL:', url, '→', newUrl);
+              return `<BaseURL>${newUrl}</BaseURL>`;
+            }
+            return match;
+          });
+          
+          // Also handle media attribute URLs
+          text = text.replace(/media="([^"]+)"/g, (match, url) => {
+            if (!url.startsWith('http')) {
+              const newUrl = decodedPrefix.endsWith('/') ? decodedPrefix + url : decodedPrefix + '/' + url;
+              return `media="${newUrl}"`;
+            }
+            return match;
+          });
+        }
+      } catch (e) {
+        console.error('❌ Failed to process URLPrefix:', e);
+      }
+      
+      res.setHeader('Content-Type', 'application/dash+xml');
+      return res.send(text);
+    }
+
+    // Everything else — pipe through
     const buf = await r.arrayBuffer();
     return res.send(Buffer.from(buf));
   } catch (e) {

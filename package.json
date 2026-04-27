@@ -8,13 +8,21 @@
     "start": "next start -p 3001"
   },
   "dependencies": {
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "firebase": "^12.11.0",
     "framer-motion": "^12.38.0",
     "hls.js": "^1.6.15",
+    "lucide-react": "^1.11.0",
     "next": "14.0.0",
     "react": "^18",
     "react-dom": "^18",
-    "shaka-player": "^5.0.9"
+    "shaka-player": "^5.0.9",
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "@types/react": "19.2.14",

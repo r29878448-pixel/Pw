@@ -446,14 +446,41 @@ const STATUS_CONFIG = {
 function getClassStatus(cls) {
   const topic = (cls.topic || '').toLowerCase();
   if (topic.includes('cancelled')) return 'cancelled';
+  
+  // Check time-based status first
+  const now = new Date();
+  const startTime = cls.startTime ? new Date(cls.startTime) : null;
+  const endTime = cls.endTime ? new Date(cls.endTime) : null;
+  
+  if (startTime) {
+    // If class has started and not ended yet, it's LIVE
+    if (now >= startTime) {
+      // Check if it has ended
+      if (endTime && now > endTime) {
+        return 'ended';
+      }
+      // If no end time, assume 2 hour duration
+      const estimatedEnd = new Date(startTime.getTime() + (2 * 60 * 60 * 1000));
+      if (now > estimatedEnd) {
+        return 'ended';
+      }
+      // Class is currently live
+      return 'live';
+    } else {
+      // Class hasn't started yet
+      return 'upcoming';
+    }
+  }
+  
+  // Fallback to tag/status if no time info
   if (cls.tag === 'live'     || cls.status === 'live')     return 'live';
   if (cls.tag === 'ended'    || cls.status === 'ended'    || topic.includes('recorded')) return 'ended';
   if (cls.tag === 'upcoming' || cls.status === 'upcoming') return 'upcoming';
   return 'upcoming';
 }
 
-function LiveClassCard({ cls, batchId, router }) {
-  const status   = getClassStatus(cls);
+function LiveClassCard({ cls, batchId, router, currentStatus }) {
+  const status   = currentStatus || getClassStatus(cls);
   const cancelled = status === 'cancelled';
   const sc       = STATUS_CONFIG[status] || STATUS_CONFIG.upcoming;
   const findKey  = cls.videoDetails?.findKey || cls.videoId || cls._id || '';
@@ -465,78 +492,193 @@ function LiveClassCard({ cls, batchId, router }) {
   const time     = cls.startTime
     ? new Date(cls.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
     : '';
+  
+  // Use the batch ID from the class if not provided (for multi-batch view)
+  const actualBatchId = batchId || cls._batchId || cls.batchId;
+  const batchName = cls._batchName || '';
 
   const handleClick = () => {
     if (cancelled) return;
-    if (status === 'live' || status === 'upcoming') {
-      router.push(`/live-player?batch_id=${batchId}&schedule_id=${scheduleId}&video_id=${findKey}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Live Class')}`);
-    } else {
-      router.push(`/player?video_id=${findKey}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Class Recording')}`);
-    }
+    // All classes (live, upcoming, recorded) open in player.js
+    router.push(`/player?video_id=${findKey}&batch_id=${actualBatchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Class')}&is_live=${status === 'live' ? '1' : '0'}`);
   };
 
   return (
     <div onClick={handleClick}
-      className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${sc.bg} ${cancelled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md active:scale-[0.99]'}`}>
+      className={`flex-shrink-0 w-[280px] rounded-2xl border overflow-hidden transition-all ${cancelled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-lg active:scale-[0.98]'} bg-white`}>
       {/* Thumbnail */}
-      <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-200 relative">
-        {thumb
-          ? <img src={thumb} alt={cls.topic} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
-          : <div className="w-full h-full flex items-center justify-center text-2xl bg-gradient-to-br from-orange-400 to-red-500">📺</div>
-        }
-        {status === 'live' && (
-          <div className="absolute top-1 left-1 flex items-center gap-0.5 bg-red-600 rounded px-1 py-0.5">
-            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-            <span className="text-white text-[8px] font-bold">LIVE</span>
+      <div className="relative w-full aspect-video bg-gray-200">
+        {thumb ? (
+          <img src={thumb} alt={cls.topic} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600">
+            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
+              <span className="text-3xl">📺</span>
+            </div>
           </div>
         )}
+        
+        {/* Status Badge */}
+        <div className="absolute top-2 right-2">
+          <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${sc.labelCls} shadow-lg`}>
+            {sc.label}
+          </span>
+        </div>
+
+        {/* Live indicator */}
+        {status === 'live' && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-red-600 rounded-full px-2 py-1 shadow-lg">
+            <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+            <span className="text-white text-[10px] font-bold">LIVE</span>
+          </div>
+        )}
+
+        {/* Batch Logo Overlay */}
+        <div className="absolute bottom-2 left-2">
+          <div className="w-10 h-10 rounded-lg bg-white shadow-md flex items-center justify-center overflow-hidden">
+            <img 
+              src="https://i.postimg.cc/dQ75LH4X/image.png" 
+              alt="PW"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = '<span class="text-lg">⚡</span>';
+              }}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate leading-snug">{cls.topic || 'Class'}</p>
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          {subject && <span className="text-xs text-gray-500 truncate max-w-[120px]">{subject}</span>}
-          {teacher && <span className="text-xs text-gray-400 truncate">• {teacher}</span>}
-        </div>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${sc.labelCls}`}>{sc.label}</span>
-          {time && <span className="text-[10px] text-gray-400 font-mono">{time}</span>}
-        </div>
-      </div>
+      {/* Content */}
+      <div className="p-3">
+        {/* Batch Name */}
+        {batchName && (
+          <p className="text-[10px] text-indigo-600 font-semibold uppercase tracking-wide mb-1 truncate">
+            {batchName}
+          </p>
+        )}
 
-      {!cancelled && <span className="text-gray-300 text-lg flex-shrink-0">›</span>}
+        {/* Title */}
+        <h3 className="font-bold text-sm text-gray-900 line-clamp-2 leading-snug mb-2 min-h-[2.5rem]">
+          {cls.topic || 'Class'}
+        </h3>
+
+        {/* Subject */}
+        {subject && (
+          <p className="text-xs text-gray-600 mb-2 truncate">
+            📚 {subject}
+          </p>
+        )}
+
+        {/* Time */}
+        {time && (
+          <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+            <span>🕐</span> {time}
+          </p>
+        )}
+
+        {/* Action Button */}
+        {!cancelled && (
+          <button className={`w-full py-2 rounded-lg font-semibold text-sm transition-all ${
+            status === 'live' 
+              ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg' 
+              : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+          }`}>
+            {status === 'live' ? '▶ Watch Live' : '▶ Play Now'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 function LiveClassesSection({ liveClasses, batchId, router }) {
   const [activeTab, setActiveTab] = useState('all');
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  const live     = liveClasses.filter(c => getClassStatus(c) === 'live');
-  const upcoming = liveClasses.filter(c => getClassStatus(c) === 'upcoming');
-  const recorded = liveClasses.filter(c => getClassStatus(c) === 'ended');
+  // Auto-refresh every 30 seconds to update live status
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+      setLastRefresh(new Date());
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const manualRefresh = () => {
+    setCurrentTime(new Date());
+    setLastRefresh(new Date());
+  };
+
+  // Recalculate status based on current time
+  const getUpdatedStatus = (cls) => {
+    const topic = (cls.topic || '').toLowerCase();
+    if (topic.includes('cancelled')) return 'cancelled';
+    
+    const now = currentTime;
+    const startTime = cls.startTime ? new Date(cls.startTime) : null;
+    const endTime = cls.endTime ? new Date(cls.endTime) : null;
+    
+    if (startTime) {
+      if (now >= startTime) {
+        if (endTime && now > endTime) {
+          return 'ended';
+        }
+        const estimatedEnd = new Date(startTime.getTime() + (2 * 60 * 60 * 1000));
+        if (now > estimatedEnd) {
+          return 'ended';
+        }
+        return 'live';
+      } else {
+        // Class hasn't started yet - don't show it
+        return 'upcoming';
+      }
+    }
+    
+    if (cls.tag === 'live' || cls.status === 'live') return 'live';
+    if (cls.tag === 'ended' || cls.status === 'ended' || topic.includes('recorded')) return 'ended';
+    if (cls.tag === 'upcoming' || cls.status === 'upcoming') return 'upcoming';
+    return 'upcoming';
+  };
+
+  // Only show classes that have started (live or ended), not upcoming
+  const allStarted = liveClasses.filter(c => {
+    const status = getUpdatedStatus(c);
+    return status !== 'cancelled' && status !== 'upcoming';
+  });
+  
+  const live     = allStarted.filter(c => getUpdatedStatus(c) === 'live');
+  const recorded = allStarted.filter(c => getUpdatedStatus(c) === 'ended');
 
   const tabs = [
-    { key: 'all',      label: 'All',       count: liveClasses.filter(c => getClassStatus(c) !== 'cancelled').length, color: 'bg-gray-800 text-white', inactive: 'text-gray-600' },
+    { key: 'all',      label: 'All',       count: allStarted.length, color: 'bg-gray-800 text-white', inactive: 'text-gray-600' },
     { key: 'live',     label: '🔴 Live',   count: live.length,     color: 'bg-red-500 text-white',  inactive: 'text-red-500' },
-    { key: 'upcoming', label: '⏰ Upcoming', count: upcoming.length, color: 'bg-blue-500 text-white', inactive: 'text-blue-500' },
     { key: 'recorded', label: '▶ Recorded', count: recorded.length, color: 'bg-gray-500 text-white', inactive: 'text-gray-500' },
   ];
 
   const filtered = activeTab === 'all'
-    ? liveClasses.filter(c => getClassStatus(c) !== 'cancelled')
+    ? allStarted
     : activeTab === 'live'     ? live
-    : activeTab === 'upcoming' ? upcoming
     : recorded;
 
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
-          Today's Classes
-        </p>
+      <div className="flex items-center justify-between mb-3 px-4">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
+            Today's Classes
+          </p>
+          <button 
+            onClick={manualRefresh}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            title="Refresh status"
+          >
+            🔄
+          </button>
+        </div>
         {live.length > 0 && (
           <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
             {live.length} LIVE
@@ -545,8 +687,8 @@ function LiveClassesSection({ liveClasses, batchId, router }) {
       </div>
 
       {/* Tabs */}
-      {liveClasses.length > 0 && (
-        <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 scrollbar-hide">
+      {allStarted.length > 0 && (
+        <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 scrollbar-hide px-4">
           {tabs.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
@@ -563,20 +705,23 @@ function LiveClassesSection({ liveClasses, batchId, router }) {
         </div>
       )}
 
-      {liveClasses.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 text-center">
+      {allStarted.length === 0 ? (
+        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 text-center mx-4">
           <div className="text-3xl mb-2">📭</div>
-          <p className="text-gray-500 text-sm">No live classes today</p>
+          <p className="text-gray-500 text-sm">No live classes right now</p>
+          <p className="text-gray-400 text-xs mt-1">Classes will appear here when they start</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-center">
+        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-center mx-4">
           <p className="text-gray-400 text-sm">No {activeTab} classes</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((cls, idx) => (
-            <LiveClassCard key={cls._id || idx} cls={cls} batchId={batchId} router={router} />
-          ))}
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="flex gap-3 px-4 pb-2">
+            {filtered.map((cls, idx) => (
+              <LiveClassCard key={cls._id || idx} cls={cls} batchId={batchId} router={router} currentStatus={getUpdatedStatus(cls)} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -660,8 +805,11 @@ const DEFAULT_BATCHES = [
 ];
 
 function BatchesGrid({ onSelect }) {
+  const router = useRouter();
   const [batches, setBatches] = useState([]);
   const [apiConfigured, setApiConfigured] = useState(false);
+  const [allLiveClasses, setAllLiveClasses] = useState([]);
+  const [loadingLive, setLoadingLive] = useState(true);
 
   useEffect(() => {
     async function loadBatches() {
@@ -693,10 +841,30 @@ function BatchesGrid({ onSelect }) {
         })));
         
         setBatches(batchesWithEdits);
+        
+        // Load live classes for all batches
+        setLoadingLive(true);
+        const livePromises = batchesWithEdits.map(async (batch) => {
+          try {
+            const liveData = await api(`/api/live?batchId=${batch.batchId}`);
+            const classes = liveData?.data || liveData || [];
+            return Array.isArray(classes) ? classes.map(cls => ({ ...cls, _batchId: batch.batchId, _batchName: batch.batchName })) : [];
+          } catch (e) {
+            console.error(`Failed to load live classes for ${batch.batchId}:`, e);
+            return [];
+          }
+        });
+        
+        const allClasses = await Promise.all(livePromises);
+        const flatClasses = allClasses.flat();
+        console.log('📺 Loaded live classes:', flatClasses.length);
+        setAllLiveClasses(flatClasses);
+        setLoadingLive(false);
       } catch (e) {
         console.error('Error loading batches:', e);
         // Fallback to default batches only
         setBatches(DEFAULT_BATCHES);
+        setLoadingLive(false);
       }
     }
     
@@ -717,6 +885,8 @@ function BatchesGrid({ onSelect }) {
           </p>
         </div>
       )}
+
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 max-w-5xl mx-auto">
         {batches.map((batch, idx) => {
@@ -792,7 +962,8 @@ function BatchesGrid({ onSelect }) {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [view, setView] = useState({ screen: 'batches', batchId: null, batch: null, subjects: [], liveClasses: [] });
+  const router = useRouter();
+  const [view, setView] = useState({ screen: 'batches' });
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -855,36 +1026,37 @@ export default function Home() {
     }
   };
 
-  const goHome = () => setView({ screen: 'batches', batchId: null, batch: null, subjects: [], liveClasses: [] });
+  const goHome = () => {
+    setView({ screen: 'batches' });
+    router.replace('/', undefined, { shallow: true });
+  };
 
-  const handleBatchSelect = async (batchId, batch) => {
+  // Handle deep-link from /batch/[batchId] when a subject is clicked
+  useEffect(() => {
+    const { batchId, batchName } = router.query;
+    if (!batchId || !user) return;
+    if (view.screen === 'subjects') return; // already loaded
+
+    setLoadingBatch(true);
+    const fakeBatch = { batchId, batchName: batchName ? decodeURIComponent(batchName) : batchId };
+
+    Promise.all([
+      api(`/api/batchdetails?batchId=${batchId}`).catch(() => ({})),
+      api(`/api/live?batchId=${batchId}`).catch(() => []),
+    ]).then(([d, live]) => {
+      const subjects = d?.data?.subjects || d?.subjects || [];
+      const arr = live?.data || live || [];
+      setView({ screen: 'subjects', batchId, batch: fakeBatch, subjects, liveClasses: Array.isArray(arr) ? arr : [] });
+    }).finally(() => setLoadingBatch(false));
+  }, [router.query, user]); // eslint-disable-line
+
+  const handleBatchSelect = (batchId, batch) => {
     if (!user) {
       setShowLoginModal(true);
       return;
     }
-    setLoadingBatch(true);
-    let subjects = [];
-    let liveClasses = [];
-    
-    try {
-      // Fetch batch details
-      const d = await api(`/api/batchdetails?batchId=${batchId}`);
-      subjects = d?.data?.subjects || d?.subjects || [];
-      
-      // Fetch live classes
-      try {
-        const liveData = await api(`/api/live?batchId=${batchId}`);
-        // Handle { data: [...] } or direct array
-        const raw = liveData?.data || liveData || [];
-        liveClasses = Array.isArray(raw) ? raw : [];
-        console.log('📺 Live classes:', liveClasses.length);
-      } catch (e) {
-        console.log('No live classes:', e.message);
-      }
-    } catch (_) {}
-    
-    setLoadingBatch(false);
-    setView({ screen: 'subjects', batchId, batch, subjects, liveClasses });
+    const name = encodeURIComponent(batch?.batchName || batch?.name || '');
+    router.push(`/batch/${batchId}?name=${name}`);
   };
 
   if (authLoading) {
@@ -906,11 +1078,6 @@ export default function Home() {
             ⚡
           </button>
           <span className="font-bold text-gray-900">Physics Wallah</span>
-          {view.batch && (
-            <span className="text-gray-400 text-xs ml-auto truncate max-w-[200px]">
-              {view.batch.batchName || view.batch.name}
-            </span>
-          )}
           {!user ? (
             <button
               onClick={() => setShowLoginModal(true)}
