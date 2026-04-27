@@ -1,5 +1,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle } from 'lucide-react';
 import { decryptData } from '@/lib/decryptBrowser';
 import { API_BASE_URL } from '@/lib/apiConfig';
 
@@ -22,6 +24,23 @@ const uint8ArrayToBase64 = (buffer) => {
   return window.btoa(binary);
 };
 
+// Extract KID from MPD
+const extractKID = async (mpdUrl) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/pw/kid?mpdUrl=${encodeURIComponent(mpdUrl)}`);
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || data.details || 'Failed to extract KID');
+    }
+    
+    return data.kid;
+  } catch (error) {
+    console.error('KID extraction failed:', error);
+    return null;
+  }
+};
+
 const VideoPlayer = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,6 +57,9 @@ const VideoPlayer = () => {
   const playerRef = useRef(null);
   const uiRef = useRef(null);
   const queryParamsRef = useRef({ queryParams: '' });
+  const qualityLockRef = useRef(false);
+  const savedQualityRef = useRef(null);
+  const isChangingQualityRef = useRef(false);
 
   // State
   const [errorMessage, setErrorMessage] = useState(null);
@@ -46,32 +68,11 @@ const VideoPlayer = () => {
   const [loadingStatus, setLoadingStatus] = useState('Initializing...');
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Extract KID from MPD manifest
-  const extractKID = useCallback(async (mpdUrl) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/pw/kid?mpdUrl=${encodeURIComponent(mpdUrl)}`);
-      const data = await response.json();
-      
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || data.details || 'Failed to extract KID');
-      }
-      
-      return data.kid;
-    } catch (error) {
-      console.error('KID extraction failed:', error);
-      return null;
-    }
-  }, []);
-
   // Initialize video player
   const initializePlayer = useCallback(async () => {
-    let isActive = true;
-
     if (!videoId || !batchId || !videoRef.current) {
-      if (isActive) {
-        setErrorMessage('Missing required video parameters.');
-        setIsLoading(false);
-      }
+      setErrorMessage('Missing required video parameters.');
+      setIsLoading(false);
       return;
     }
 
@@ -84,8 +85,7 @@ const VideoPlayer = () => {
     try {
       let videoUrl = null;
 
-      // Try multiple API endpoints to get video URL
-      // Attempt 1: /api/pw/get-url
+      // Try multiple API endpoints
       try {
         const response = await fetch(`${API_BASE_URL}/api/pw/get-url?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
         if (response.ok) {
@@ -100,7 +100,6 @@ const VideoPlayer = () => {
 
       setLoadingProgress(30);
 
-      // Attempt 2: /api/pw/video
       if (!videoUrl) {
         try {
           const response = await fetch(`${API_BASE_URL}/api/pw/video?batchId=${batchId}&subjectId=${subjectSlug}&childId=${videoId}`);
@@ -122,7 +121,6 @@ const VideoPlayer = () => {
 
       setLoadingProgress(50);
 
-      // Attempt 3: /api/pw/videoplay
       if (!videoUrl) {
         try {
           const response = await fetch(`${API_BASE_URL}/api/pw/videoplay?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
@@ -130,8 +128,7 @@ const VideoPlayer = () => {
             const data = await response.json();
             if (data.success && Array.isArray(data.data) && data.data.length > 0 && data.data[0].url) {
               if (data.data[0].type === 'youtube') {
-                // Handle YouTube separately if needed
-                setErrorMessage('YouTube videos not supported in this player');
+                setErrorMessage('YouTube videos not supported');
                 setIsLoading(false);
                 return;
               }
@@ -143,7 +140,6 @@ const VideoPlayer = () => {
         }
       }
 
-      // Attempt 4: /api/pw/get-urls
       if (!videoUrl) {
         try {
           const response = await fetch(`${API_BASE_URL}/api/pw/get-urls?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
@@ -151,7 +147,7 @@ const VideoPlayer = () => {
             const data = await response.json();
             if (data.success && Array.isArray(data.data) && data.data.length > 0 && data.data[0].url) {
               if (data.data[0].type === 'youtube') {
-                setErrorMessage('YouTube videos not supported in this player');
+                setErrorMessage('YouTube videos not supported');
                 setIsLoading(false);
                 return;
               }
@@ -171,7 +167,7 @@ const VideoPlayer = () => {
         return;
       }
 
-      // Extract query params for signed URLs
+      // Extract query params
       const urlParts = videoUrl.split('?');
       if (urlParts.length > 1) {
         queryParamsRef.current.queryParams = '?' + urlParts[1];
@@ -180,7 +176,7 @@ const VideoPlayer = () => {
       setLoadingStatus('Fetching decryption keys...');
       setLoadingProgress(75);
 
-      // Convert m3u8 to mpd for KID extraction
+      // Get KID and OTP key
       const mpdUrl = urlParts[0].replace(/\.m3u8/i, '.mpd') + queryParamsRef.current.queryParams;
       const kid = await extractKID(mpdUrl);
 
@@ -188,7 +184,6 @@ const VideoPlayer = () => {
         throw new Error('Could not extract Key ID (KID) from video manifest.');
       }
 
-      // Fetch OTP key
       const otpResponse = await fetch(`${API_BASE_URL}/api/pw/otp?kid=${kid}`);
       if (!otpResponse.ok) {
         throw new Error(`Failed to fetch decryption key (status: ${otpResponse.status})`);
@@ -212,11 +207,9 @@ const VideoPlayer = () => {
       const videoElement = videoRef.current;
       const containerElement = containerRef.current;
 
-      // Initialize Shaka Player
       const player = new shaka.Player(videoElement);
       playerRef.current = player;
 
-      // Initialize UI
       const ui = new shaka.ui.Overlay(player, containerElement, videoElement);
       uiRef.current = ui;
       ui.getControls();
@@ -226,12 +219,31 @@ const VideoPlayer = () => {
         abr: { enabled: false }
       });
 
+      // Adaptation event for quality lock
+      player.addEventListener('adaptation', () => {
+        if (qualityLockRef.current && savedQualityRef.current && !isChangingQualityRef.current) {
+          const tracks = player.getVariantTracks();
+          const activeTrack = tracks.filter(t => t.active)[0];
+          
+          if (activeTrack?.height !== savedQualityRef.current) {
+            const targetTrack = tracks.find(t => t.height === savedQualityRef.current);
+            if (targetTrack) {
+              isChangingQualityRef.current = true;
+              player.selectVariantTrack(targetTrack, true);
+              setTimeout(() => {
+                isChangingQualityRef.current = false;
+              }, 100);
+            }
+          }
+        }
+      });
+
       // Error handling
       player.addEventListener('error', (event) => {
         console.error('Shaka Player Error:', event.detail);
       });
 
-      // Request filter to add query params and referer
+      // Request filter
       player.getNetworkingEngine().registerRequestFilter((type, request) => {
         request.headers['Referer'] = 'https://www.pw.live/';
         
@@ -243,7 +255,7 @@ const VideoPlayer = () => {
         }
       });
 
-      // Response filter to inject decryption key into m3u8
+      // Response filter to inject key
       player.getNetworkingEngine().registerResponseFilter((type, response) => {
         if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
           const manifestText = new TextDecoder().decode(response.data);
@@ -262,31 +274,61 @@ const VideoPlayer = () => {
         }
       });
 
-      // Load the m3u8 stream
+      // Load m3u8
       const m3u8Url = videoUrl.replace(/\.mpd/i, '.m3u8');
       await player.load(m3u8Url);
 
-      if (isActive) {
-        setIsLoading(false);
-        setLoadingProgress(100);
-        
-        // Auto-play
-        videoElement.play().catch(() => {
-          console.log('Autoplay was prevented.');
-        });
+      // Restore quality preference
+      try {
+        const savedQuality = localStorage.getItem('videoQualityPreference');
+        if (savedQuality) {
+          const targetHeight = parseInt(savedQuality, 10);
+          savedQualityRef.current = targetHeight;
+          qualityLockRef.current = true;
+          player.configure({ abr: { enabled: false } });
+
+          const trySetQuality = () => {
+            const tracks = player.getVariantTracks();
+            const targetTrack = tracks.find(t => t.height === targetHeight);
+            if (targetTrack) {
+              isChangingQualityRef.current = true;
+              player.selectVariantTrack(targetTrack, true);
+              setTimeout(() => {
+                isChangingQualityRef.current = false;
+              }, 100);
+              return true;
+            }
+            return false;
+          };
+
+          if (!trySetQuality()) {
+            let attempts = 0;
+            const interval = setInterval(() => {
+              if (trySetQuality() || attempts++ > 5) {
+                clearInterval(interval);
+              }
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore quality from storage', error);
       }
+
+      setIsLoading(false);
+      setLoadingProgress(100);
+      
+      videoElement.play().catch(() => {
+        console.log('Autoplay was prevented.');
+      });
+
     } catch (error) {
       console.error('Player initialization failed:', error);
-      if (isActive) {
-        setErrorMessage(error.message || 'An unknown error occurred during setup.');
-        setIsLoading(false);
-        setLoadingProgress(0);
-      }
+      setErrorMessage(error.message || 'An unknown error occurred during setup.');
+      setIsLoading(false);
+      setLoadingProgress(0);
     }
 
-    // Cleanup function
     return () => {
-      isActive = false;
       if (playerRef.current) {
         playerRef.current.destroy();
       }
@@ -294,9 +336,8 @@ const VideoPlayer = () => {
         uiRef.current.destroy();
       }
     };
-  }, [videoId, batchId, subjectSlug, subjectId, extractKID]);
+  }, [videoId, batchId, subjectSlug, subjectId]);
 
-  // Initialize player on mount
   useEffect(() => {
     const cleanup = initializePlayer();
     return () => {
@@ -308,24 +349,28 @@ const VideoPlayer = () => {
 
   return (
     <div ref={containerRef} className="video-container">
-      {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 z-10">
-          <div className="spinner" />
-          <p className="text-white mt-2">{loadingStatus}</p>
-          <div className="w-48 bg-gray-600 rounded-full h-1.5 overflow-hidden">
-            <div 
-              className="bg-white h-1.5 rounded-full" 
-              style={{ 
-                width: `${loadingProgress}%`, 
-                transition: 'width 0.5s ease-in-out' 
-              }} 
-            />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 z-10"
+          >
+            <div className="spinner" />
+            <p className="text-white mt-2">{loadingStatus}</p>
+            <div className="w-48 bg-gray-600 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className="bg-white h-1.5 rounded-full" 
+                style={{ 
+                  width: `${loadingProgress}%`, 
+                  transition: 'width 0.5s ease-in-out' 
+                }} 
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Video Element */}
       <video
         ref={videoRef}
         playsInline
@@ -333,15 +378,16 @@ const VideoPlayer = () => {
         style={{ width: '100%', height: '100%' }}
       />
 
-      {/* Error Messages */}
       {!isLoading && (errorMessage || batchNotAvailable) && (
         batchNotAvailable ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-20 p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-20 p-4"
+          >
             <div className="text-center max-w-md">
               <div className="bg-amber-500/10 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                <svg className="h-10 w-10 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+                <AlertTriangle className="h-10 w-10 text-amber-500" />
               </div>
               <h2 className="font-bold text-xl mb-2 text-white">Batch Not Available</h2>
               <p className="text-sm text-gray-300 mb-2">This batch isn't available on our site yet.</p>
@@ -356,14 +402,16 @@ const VideoPlayer = () => {
                 <p className="text-xs text-gray-500">Donating a batch is safe and harmless to your account. Help each other and support us.</p>
               </div>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-20">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-20"
+          >
             <div className="text-center p-8 max-w-md">
               <div className="bg-red-500/10 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                <svg className="h-10 w-10 text-red-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+                <AlertTriangle className="h-10 w-10 text-red-500" />
               </div>
               <h2 className="font-bold text-xl mb-2 text-white">Playback Error</h2>
               <p className="text-sm text-gray-400 mb-6">{errorMessage}</p>
@@ -374,7 +422,7 @@ const VideoPlayer = () => {
                 Try Again
               </button>
             </div>
-          </div>
+          </motion.div>
         )
       )}
 
