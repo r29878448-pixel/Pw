@@ -5,7 +5,6 @@ import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPass
 import { getApiUrl, getCustomBatches, getBatchWithEdits } from '../lib/apiConfig';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-
 // API calls through Vercel routes (handles CORS properly)
 const api = async (endpoint) => {
   console.log('🌐 API Call:', endpoint);

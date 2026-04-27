@@ -2,7 +2,6 @@
 
 ## Base URL
 All API endpoints are relative to your Next.js app: `/api/`
-
 ---
 
 ## Endpoints
