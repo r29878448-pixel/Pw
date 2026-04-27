@@ -1,13 +1,11 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
-import { useKeyValidation } from '@/hooks/useKeyValidation';
 import { decryptData } from '@/lib/decryptBrowser';
 import { API_BASE_URL } from '@/lib/apiConfig';
 
 const VideoPlayer = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isKeyValid, loading: keyLoading } = useKeyValidation();
 
   // URL Parameters
   const videoId = searchParams.get('video_id');
@@ -286,20 +284,13 @@ const VideoPlayer = () => {
 
   // Initialize player on mount
   useEffect(() => {
-    if (keyLoading) return;
-    
-    if (!isKeyValid) {
-      router.replace('/delta-auth');
-      return;
-    }
-
     const cleanup = initializePlayer();
     return () => {
       cleanup.then(cleanupFn => {
         if (cleanupFn) cleanupFn();
       });
     };
-  }, [initializePlayer, isKeyValid, keyLoading, router]);
+  }, [initializePlayer]);
 
   // Fetch attachments when sheet opens
   useEffect(() => {
@@ -308,7 +299,7 @@ const VideoPlayer = () => {
     }
   }, [showAttachments, fetchAttachments]);
 
-  const isLoadingState = isLoading || keyLoading;
+  const isLoadingState = isLoading;
 
   return (
     <div ref={containerRef} className="video-container">
