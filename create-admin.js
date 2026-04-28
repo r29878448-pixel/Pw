@@ -16,8 +16,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-const ADMIN_EMAIL = 'adityaghoghari01@gmail.com';
-const ADMIN_PASSWORD = 'aditya-ghoghari1234';
+const ADMIN_EMAIL = 'growai99@gmail.com';
+const ADMIN_PASSWORD = 'Mnbvcxzlk';
 
 async function createAdmin() {
   try {
