@@ -15,7 +15,7 @@ export default function DrmPlay() {
     if (q.subject_slug) params.set('subject_slug', q.subject_slug);
     if (q.topicSlug)   params.set('topicSlug',   q.topicSlug);
     if (q.title)       params.set('title',       q.title);
-    router.replace(`/player?${params.toString()}`);
+    router.replace(`/plyr-player?${params.toString()}`);
   }, [router.isReady]);
 
   return (

@@ -278,7 +278,7 @@ function ContentView({ batchId, subjectSlug, subjectId, topic, trail }) {
               const findKey = vd.findKey || item._id || '';
               const scheduleId = item._id || findKey;
               const actualTopicSlug = item._actualTopicSlug || topicSlug;
-              const playerUrl = `/player?video_id=${findKey}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId || '')}&topicSlug=${encodeURIComponent(actualTopicSlug)}&title=${encodeURIComponent(title)}`;
+              const playerUrl = `/plyr-player?video_id=${findKey}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId || '')}&topicSlug=${encodeURIComponent(actualTopicSlug)}&title=${encodeURIComponent(title)}`;
 
               return (
                 <div key={item._id || idx}
@@ -500,7 +500,7 @@ function LiveClassCard({ cls, batchId, router, currentStatus }) {
   const handleClick = () => {
     if (cancelled) return;
     // All classes (live, upcoming, recorded) open in player.js
-    router.push(`/player?video_id=${findKey}&batch_id=${actualBatchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Class')}&is_live=${status === 'live' ? '1' : '0'}`);
+    router.push(`/plyr-player?video_id=${findKey}&batch_id=${actualBatchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Class')}&is_live=${status === 'live' ? '1' : '0'}`);
   };
 
   return (

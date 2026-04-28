@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { decryptData } from '@/lib/decryptBrowser';
-import { API_BASE_URL } from '@/lib/apiConfig';
 
 // Helper functions for DRM
 const hexToUint8Array = (hex) => {
@@ -27,7 +26,7 @@ const uint8ArrayToBase64 = (buffer) => {
 // Extract KID from MPD
 const extractKID = async (mpdUrl) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/pw/kid?mpdUrl=${encodeURIComponent(mpdUrl)}`);
+    const response = await fetch(`/api/proxy/kid?mpdUrl=${encodeURIComponent(mpdUrl)}`);
     const data = await response.json();
     
     if (!response.ok || !data.success) {
@@ -85,9 +84,9 @@ const VideoPlayer = () => {
     try {
       let videoUrl = null;
 
-      // Try multiple API endpoints
+      // Try multiple API endpoints using local proxies
       try {
-        const response = await fetch(`${API_BASE_URL}/api/pw/get-url?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
+        const response = await fetch(`/api/proxy/get-url?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && Array.isArray(data.data) && data.data.length > 0 && data.data[0].url) {
@@ -95,14 +94,14 @@ const VideoPlayer = () => {
           }
         }
       } catch (error) {
-        console.warn('/api/pw/get-url failed, proceeding to fallbacks.', error);
+        console.warn('/api/proxy/get-url failed, proceeding to fallbacks.', error);
       }
 
       setLoadingProgress(30);
 
       if (!videoUrl) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/pw/video?batchId=${batchId}&subjectId=${subjectSlug}&childId=${videoId}`);
+          const response = await fetch(`/api/proxy/video?batchId=${batchId}&subjectId=${subjectSlug}&childId=${videoId}`);
           if (response.ok) {
             const data = await response.json();
             if (data.data) {
@@ -123,7 +122,7 @@ const VideoPlayer = () => {
 
       if (!videoUrl) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/pw/videoplay?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
+          const response = await fetch(`/api/proxy/videoplay?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
           if (response.ok) {
             const data = await response.json();
             if (data.success && Array.isArray(data.data) && data.data.length > 0 && data.data[0].url) {
@@ -136,13 +135,13 @@ const VideoPlayer = () => {
             }
           }
         } catch (error) {
-          console.warn('/api/pw/videoplay failed', error);
+          console.warn('/api/proxy/videoplay failed', error);
         }
       }
 
       if (!videoUrl) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/pw/get-urls?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
+          const response = await fetch(`/api/proxy/get-urls?batchId=${batchId}&childId=${videoId}&subjectId=${subjectId}`);
           if (response.ok) {
             const data = await response.json();
             if (data.success && Array.isArray(data.data) && data.data.length > 0 && data.data[0].url) {
@@ -155,7 +154,7 @@ const VideoPlayer = () => {
             }
           }
         } catch (error) {
-          console.warn('/api/pw/get-urls failed', error);
+          console.warn('/api/proxy/get-urls failed', error);
         }
       }
 
@@ -184,7 +183,7 @@ const VideoPlayer = () => {
         throw new Error('Could not extract Key ID (KID) from video manifest.');
       }
 
-      const otpResponse = await fetch(`${API_BASE_URL}/api/pw/otp?kid=${kid}`);
+      const otpResponse = await fetch(`/api/proxy/otp?kid=${kid}`);
       if (!otpResponse.ok) {
         throw new Error(`Failed to fetch decryption key (status: ${otpResponse.status})`);
       }
@@ -274,9 +273,29 @@ const VideoPlayer = () => {
         }
       });
 
-      // Load m3u8
-      const m3u8Url = videoUrl.replace(/\.mpd/i, '.m3u8');
-      await player.load(m3u8Url);
+      // Determine the correct URL format to load
+      // If original URL is MPD, try M3U8 first (fallback to MPD if needed)
+      // If original URL is M3U8, use M3U8
+      let playbackUrl = videoUrl;
+      const isMpdUrl = videoUrl.toLowerCase().includes('.mpd');
+      
+      if (isMpdUrl) {
+        // Try M3U8 version first for better compatibility
+        playbackUrl = videoUrl.replace(/\.mpd/i, '.m3u8');
+      }
+      
+      try {
+        await player.load(playbackUrl);
+      } catch (error) {
+        // If M3U8 fails and we have an MPD URL, try loading MPD directly
+        if (isMpdUrl && playbackUrl.includes('.m3u8')) {
+          console.warn('M3U8 failed, trying MPD format:', error);
+          playbackUrl = videoUrl; // Use original MPD URL
+          await player.load(playbackUrl);
+        } else {
+          throw error;
+        }
+      }
 
       // Restore quality preference
       try {
@@ -391,15 +410,15 @@ const VideoPlayer = () => {
               </div>
               <h2 className="font-bold text-xl mb-2 text-white">Batch Not Available</h2>
               <p className="text-sm text-gray-300 mb-2">This batch isn't available on our site yet.</p>
-              <p className="text-sm text-gray-400 mb-6">If you know someone who has purchased this batch, kindly ask them to donate it on our site.</p>
+              <p className="text-sm text-gray-400 mb-6">If you have purchased this batch, please contact admin on Telegram to donate it.</p>
               <div className="space-y-3">
                 <button
-                  onClick={() => window.open('https://deltastudy.site/donate', '_blank')}
+                  onClick={() => alert('Please go to Telegram and DM the admin to donate this batch. Donating is safe and helps everyone!')}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded"
                 >
-                  Donate Now
+                  Contact Admin
                 </button>
-                <p className="text-xs text-gray-500">Donating a batch is safe and harmless to your account. Help each other and support us.</p>
+                <p className="text-xs text-gray-500">Go to Telegram and DM admin. Donating a batch is safe and harmless to your account.</p>
               </div>
             </div>
           </motion.div>

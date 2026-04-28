@@ -19,7 +19,7 @@ export default function LivePlayer() {
     if (title) params.set('title', title);
     params.set('is_live', '1');
     
-    router.replace(`/player?${params.toString()}`);
+    router.replace(`/plyr-player?${params.toString()}`);
   }, [router.isReady, router.query]);
 
   return (

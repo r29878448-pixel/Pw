@@ -64,11 +64,9 @@ function PdfRow({ item, onOpen, loading }) {
 // ─── Video Card ───────────────────────────────────────────────────────────────
 function VideoCard({ item, onPlay }) {
   const date = item.date ? new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  
   return (
-    <div
-      onClick={() => onPlay(item)}
-      className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
-    >
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
       <div className="relative aspect-video overflow-hidden bg-gray-100">
         <img
           src={item.thumbnail || 'https://i.ibb.co/9Hm0NqsH/f69ed82b-7169-45fc-a82b-915e453c6340.png'}
@@ -95,6 +93,7 @@ function VideoCard({ item, onPlay }) {
           </div>
         )}
         <button
+          onClick={() => onPlay(item)}
           className="w-full py-2 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
           style={{ backgroundColor: '#5a4bda' }}
         >
@@ -230,13 +229,14 @@ export default function TopicContent() {
   // ── play video ────────────────────────────────────────────────────────────────
   const playVideo = (item) => {
     if (!item.findKey) return alert('Video not ready yet');
+    // Show modal to choose player
     setVideoModal(item);
   };
 
   const goPlay = (platform) => {
     if (!videoModal) return;
-    const path = platform === 'apple' ? '/pw/drm/apple/play' : '/pw/drm/play';
-    router.push(`${path}?video_id=${videoModal.findKey}&subject_slug=${subjectSlug}&batch_id=${batchId}&schedule_id=${videoModal._id}&subject_id=${encodeURIComponent(subjectId || subjectSlug)}&topicSlug=${encodeURIComponent(topicSlug)}`);
+    // Both Apple and Android now redirect to player.js
+    router.push(`/player?video_id=${videoModal.findKey}&subject_slug=${subjectSlug}&batch_id=${batchId}&schedule_id=${videoModal._id}&subject_id=${encodeURIComponent(subjectId || subjectSlug)}&topicSlug=${encodeURIComponent(topicSlug)}`);
     setVideoModal(null);
   };
 
@@ -329,13 +329,14 @@ export default function TopicContent() {
           <IconVideo className="w-5 h-5 text-indigo-600" />
           <p className="font-semibold text-base truncate">{videoModal?.topic}</p>
         </div>
+        <p className="text-xs text-gray-500 mb-4 text-center">Choose your player</p>
         <div className="space-y-3">
-          <button onClick={() => goPlay('apple')} className="w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 transition">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>
-            Play on Apple
-          </button>
           <button onClick={() => goPlay('drm')} className="w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition" style={{ backgroundColor: '#5a4bda' }}>
             <IconPhone className="w-5 h-5" /> Android / Normal
+          </button>
+          <button onClick={() => goPlay('apple')} className="w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 transition">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>
+            Apple
           </button>
         </div>
       </BottomSheet>
