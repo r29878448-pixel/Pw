@@ -368,6 +368,45 @@ const VideoPlayer = () => {
 
   return (
     <div ref={containerRef} className="video-container">
+      {/* Download button overlay */}
+      {!isLoading && !errorMessage && !batchNotAvailable && (
+        <button
+          onClick={() => {
+            // Pass current video params to download page
+            const params = new URLSearchParams();
+            if (videoId) params.set('video_id', videoId);
+            if (batchId) params.set('batch_id', batchId);
+            if (subjectId) params.set('subject_id', subjectId);
+            if (subjectSlug) params.set('subject_slug', subjectSlug);
+            const titleParam = searchParams.get('title');
+            if (titleParam) params.set('title', titleParam);
+            window.location.href = `/download?${params.toString()}`;
+          }}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'rgba(90,75,218,0.9)',
+            border: 'none',
+            borderRadius: 8,
+            cursor: 'pointer',
+            color: '#fff',
+            padding: '8px 14px',
+            fontSize: 13,
+            fontWeight: 700,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 13v8m0 0-4-4m4 4 4-4M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/>
+          </svg>
+          Download
+        </button>
+      )}
       <AnimatePresence>
         {isLoading && (
           <motion.div

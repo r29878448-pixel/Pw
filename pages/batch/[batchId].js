@@ -152,7 +152,7 @@ function LiveCard({ cls, batchId, router }) {
       // Use /live for live streams
       router.push(`/live?batch_id=${batchId}&schedule_id=${cls._id}&video_id=${findKey}&subject_id=${encodeURIComponent(subjectId)}&subject_slug=${encodeURIComponent(subject)}&title=${encodeURIComponent(cls.topic || 'Live Class')}`);
     } else {
-      router.push(`/plyr-player?video_id=${findKey}&batch_id=${batchId}&schedule_id=${cls._id}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Recording')}`);
+      router.push(`/player?video_id=${findKey}&batch_id=${batchId}&schedule_id=${cls._id}&subject_id=${encodeURIComponent(subjectId)}&title=${encodeURIComponent(cls.topic || 'Recording')}`);
     }
   };
 
