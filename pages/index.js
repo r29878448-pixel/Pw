@@ -1742,8 +1742,8 @@ function BatchesGrid({ onSelect }) {
         <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowSidebar(false)}>
           <div className="w-72 h-full bg-black text-white p-6 border-r border-gray-800" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-8">
-              <img src="https://i.ibb.co/m53b0YKH/file-00000000d664720997f7f5165cbd5131.png" alt="Mission-Pw" className="w-12 h-12 rounded-xl object-cover" />
-              <span className="text-xl font-bold">Mission-PW</span>
+              <img src="https://i.ibb.co/x8Hr5nj6/photo-6267164133585260337-x.jpg" alt="Pw" className="w-12 h-12 rounded-xl object-cover" />
+              <span className="text-xl font-bold">Pw</span>
             </div>
             <div className="space-y-2">
               <button 
