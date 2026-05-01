@@ -812,6 +812,395 @@ function TopicsView({ batchId, subject, trail }) {
                 <div className="flex gap-3 mt-0.5 text-xs text-gray-400">
                   {topic.lectureVideos > 0 && <span>🎥 {topic.lectureVideos}</span>}
                   {topic.notes > 0 && <span>📄 {topic.notes}</span>}
+                  {topic.exercises > 0 && <span>📝 {topic.exercises}  const pdfs = [];
+  for (const hw of item.homeworkIds || []) {
+    for (const att of hw.attachmentIds || []) {
+      if (!att.key) continue;
+      pdfs.push({
+        url: (att.baseUrl || 'https://static.pw.live/') + att.key,
+        name: att.name || hw.topic || 'document.pdf',
+        topic: hw.topic || item.topic || 'Document',
+        note: hw.note || '',
+      });
+    }
+  }
+  if (pdfs.length === 0 && (item.url || item.pdfUrl)) {
+    pdfs.push({ url: item.url || item.pdfUrl, name: (item.topic || 'doc') + '.pdf', topic: item.topic || 'Document', note: '' });
+  }
+  return pdfs;
+}
+
+// ─── Shared UI ────────────────────────────────────────────────────────────────
+
+const Spin = () => (
+  <div className="flex justify-center py-16">
+    <div className="w-10 h-10 rounded-full border-[3px] border-orange-200 border-t-orange-500 animate-spin" />
+  </div>
+);
+
+const Err = ({ msg, retry }) => (
+  <div className="text-center py-12">
+    <div className="text-5xl mb-3">😵</div>
+    <p className="text-red-500 text-sm mb-4">{msg}</p>
+    {retry && <button onClick={retry} className="px-5 py-2 bg-orange-500 text-white rounded-xl text-sm hover:bg-orange-600 transition">Retry</button>}
+  </div>
+);
+
+const Empty = ({ t }) => (
+  <div className="text-center py-16 text-gray-400">
+    <div className="text-5xl mb-3">📭</div>
+    <p>{t}</p>
+  </div>
+);
+
+const Crumb = ({ trail }) => (
+  <div className="flex flex-wrap items-center gap-1.5 text-xs mb-5">
+    {trail.map((x, i) => (
+      <span key={i} className="flex items-center gap-1.5">
+        {i > 0 && <span className="text-gray-300">›</span>}
+        {x.fn
+          ? <button onClick={x.fn} className="text-orange-500 hover:text-orange-600 font-medium">{x.label}</button>
+          : <span className="text-gray-800 font-semibold">{x.label}</span>}
+      </span>
+    ))}
+  </div>
+);
+
+// ─── PDF Modal ────────────────────────────────────────────────────────────────
+
+function PdfModal({ pdf, onClose }) {
+  const { url, name, topic } = pdf;
+  const fname = encodeURIComponent(name || 'document.pdf');
+  const viewUrl = `/api/pdfproxy?url=${encodeURIComponent(url)}&filename=${fname}`;
+  const dlUrl = `/api/pdfproxy?url=${encodeURIComponent(url)}&filename=${fname}&dl=1`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 flex-shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span>📄</span>
+            <p className="font-semibold text-gray-800 text-sm truncate">{topic || name}</p>
+          </div>
+          <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+            <a href={dlUrl} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs rounded-lg font-medium transition">⬇ Download</a>
+            <a href={url} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg font-medium transition">🔗 Open</a>
+            <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-lg text-2xl leading-none transition-colors">×</button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <iframe src={viewUrl} className="w-full h-full border-0" title={topic} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Note Item ────────────────────────────────────────────────────────────────
+
+function AutoOpen({ onMount }) {
+  useEffect(() => { onMount(); }, [onMount]);
+  return null;
+}
+
+function NoteItem({ item, batchId, subjectId, tabColor }) {
+  const [pdfs, setPdfs] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selPdf, setSelPdf] = useState(null);
+
+  const staticPdfs = extractPdfs(item);
+
+  const fetchPdfs = async () => {
+    if (pdfs !== null || loading) return;
+    setLoading(true);
+    try {
+      const r = await api(`/api/pdfurl?batchId=${batchId}&subjectId=${encodeURIComponent(subjectId)}&scheduleId=${item._id}`);
+      setPdfs(r.pdfs || []);
+    } catch (_) {
+      setPdfs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const allPdfs = staticPdfs.length > 0 ? staticPdfs : (pdfs || []);
+  const title = item.topic || item.homeworkIds?.[0]?.topic || 'Document';
+  const date = item.date ? new Date(item.date).toLocaleDateString('en-IN') : '';
+
+  return (
+    <>
+      <div
+        onClick={staticPdfs.length > 0 ? () => setSelPdf(staticPdfs[0]) : fetchPdfs}
+        className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:border-emerald-200 hover:shadow-md cursor-pointer transition-all group"
+      >
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0 ${tabColor.ic}`}>
+          {loading ? <span className="w-4 h-4 rounded-full border-2 border-emerald-300 border-t-emerald-600 animate-spin" /> : '📄'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-800 truncate group-hover:text-emerald-600 transition-colors">{title}</p>
+          <div className="flex gap-2 mt-0.5 text-xs text-gray-400 flex-wrap">
+            {date && <span>📅 {date}</span>}
+            {pdfs !== null && pdfs.length === 0 && <span className="text-red-400">PDF unavailable</span>}
+            {allPdfs.length > 1 && <span className="text-emerald-500">{allPdfs.length} files</span>}
+          </div>
+        </div>
+        {allPdfs.length > 0 && (
+          <span className={`text-xs px-2.5 py-1 rounded-full flex-shrink-0 font-medium ${tabColor.bd}`}>👁 View</span>
+        )}
+      </div>
+
+      {pdfs !== null && pdfs.length > 1 && (
+        <div className="ml-4 space-y-1 mt-1">
+          {pdfs.map((pdf, i) => (
+            <div key={i} onClick={() => setSelPdf(pdf)}
+              className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg hover:bg-emerald-50 cursor-pointer transition-all group">
+              <span className="text-sm">📄</span>
+              <p className="text-xs text-gray-700 truncate group-hover:text-emerald-600 flex-1">{pdf.topic || pdf.name}</p>
+              <span className="text-xs text-emerald-500">View</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pdfs !== null && pdfs.length === 1 && !selPdf && (
+        <AutoOpen onMount={() => setSelPdf(pdfs[0])} />
+      )}
+
+      {selPdf && <PdfModal pdf={selPdf} onClose={() => setSelPdf(null)} />}
+    </>
+  );
+}
+
+// ─── Content View ─────────────────────────────────────────────────────────────
+
+function ContentView({ batchId, subjectSlug, subjectId, topic, trail }) {
+  const router = useRouter();
+  const [tab, setTab] = useState('videos');
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const topicSlug = topic.slug || topic._id || '';
+  const isAllContent = topicSlug === '__all__';
+
+  const load = useCallback(async (t) => {
+    setLoading(true); setErr(''); setItems([]);
+    try {
+      let list = [];
+      if (isAllContent) {
+        const td = await api(`/api/topics?batchId=${batchId}&subjectSlug=${encodeURIComponent(subjectSlug)}`);
+        const allTopics = td?.data || td?.topics || td || [];
+        const results = await Promise.allSettled(
+          allTopics.slice(0, 20).map(tp =>
+            api(`/api/content?batchId=${batchId}&subjectSlug=${encodeURIComponent(subjectSlug)}&topicSlug=${encodeURIComponent(tp.slug || tp._id)}&contentType=${t}`)
+              .then(d => {
+                const items = d?.data || d?.content || d?.items || d || [];
+                return Array.isArray(items) ? items.map(item => ({ ...item, _actualTopicSlug: tp.slug || tp._id })) : [];
+              })
+              .catch(() => [])
+          )
+        );
+        list = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      } else {
+        const d = await api(`/api/content?batchId=${batchId}&subjectSlug=${encodeURIComponent(subjectSlug)}&topicSlug=${encodeURIComponent(topicSlug)}&contentType=${t}`);
+        list = d?.data || d?.content || d?.items || d || [];
+      }
+      setItems(Array.isArray(list) ? list : []);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [batchId, subjectSlug, topicSlug, isAllContent]);
+
+  useEffect(() => { load(tab); }, [tab, load]);
+
+  const cur = TABS.find(t => t.key === tab);
+  const isVideo = tab === 'videos';
+
+  return (
+    <div>
+      <Crumb trail={[...trail, { label: topic.name || topic.title }]} />
+
+      <div className="flex items-start gap-3 mb-5 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+        <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0">📖</div>
+        <div>
+          <p className="text-xs text-orange-500 font-semibold uppercase tracking-wide">Chapter</p>
+          <p className="font-bold text-gray-800">{topic.name || topic.title}</p>
+          <div className="flex gap-3 mt-1 flex-wrap text-xs text-gray-400">
+            {topic.lectureVideos > 0 && <span>🎥 {topic.lectureVideos} lectures</span>}
+            {topic.notes > 0 && <span>📄 {topic.notes} notes</span>}
+            {topic.exercises > 0 && <span>📝 {topic.exercises} DPP</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-1.5 mb-5 bg-gray-100 p-1 rounded-xl w-fit">
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === t.key ? t.ac + ' shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <Spin />}
+      {err && <Err msg={err} retry={() => load(tab)} />}
+
+      {!loading && !err && isVideo && (
+        items.length === 0
+          ? <Empty t="Is chapter mein videos nahi hain" />
+          : <div className="space-y-2">
+            {items.map((item, idx) => {
+              const vd = item.videoDetails || {};
+              const title = item.topic || vd.name || `Video ${idx + 1}`;
+              const thumb = vd.image || item.thumbnail;
+              const duration = vd.duration || item.duration;
+              const date = item.date ? new Date(item.date).toLocaleDateString('en-IN') : '';
+              const findKey = vd.findKey || item._id || '';
+              const scheduleId = item._id || findKey;
+              const actualTopicSlug = item._actualTopicSlug || topicSlug;
+              const playerUrl = `/player?video_id=${findKey}&subject_slug=${encodeURIComponent(subjectSlug)}&batch_id=${batchId}&schedule_id=${scheduleId}&subject_id=${encodeURIComponent(subjectId || '')}&topicSlug=${encodeURIComponent(actualTopicSlug)}&title=${encodeURIComponent(title)}`;
+
+              return (
+                <div key={item._id || idx}
+                  onClick={() => router.push(playerUrl)}
+                  className="bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all overflow-hidden cursor-pointer">
+                  <div className="flex items-center gap-3 p-3 group">
+                    {thumb ? (
+                      <div className="w-20 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                        <img src={thumb} alt={title} loading="lazy" className="w-full h-full object-cover"
+                          onError={e => { e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center text-xl bg-blue-50">🎥</div>'; }} />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0 bg-blue-50 text-blue-500">🎥</div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate group-hover:text-blue-600 transition-colors">{title}</p>
+                      <div className="flex gap-3 mt-0.5 text-xs text-gray-400 flex-wrap">
+                        {duration && <span>⏱ {duration}</span>}
+                        {date && <span>📅 {date}</span>}
+                        {item.isFree && <span className="text-green-500 font-medium">FREE</span>}
+                      </div>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-full flex-shrink-0 font-medium bg-blue-100 text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">▶ Watch</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+      )}
+
+      {!loading && !err && !isVideo && (
+        items.length === 0
+          ? <Empty t={`Is chapter mein ${tab} nahi hain`} />
+          : <div className="space-y-2">
+            {items.map((item, idx) => (
+              <NoteItem
+                key={item._id || idx}
+                item={item}
+                batchId={batchId}
+                subjectId={subjectSlug}
+                tabColor={cur}
+              />
+            ))}
+          </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Topics View ──────────────────────────────────────────────────────────────
+
+function TopicsView({ batchId, subject, trail }) {
+  const [topics, setTopics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [sel, setSel] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const subjectSlug = subject.slug || subject.subjectSlug;
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr('');
+    try {
+      const d = await api(`/api/topics?batchId=${batchId}&subjectSlug=${encodeURIComponent(subjectSlug)}`);
+      const list = d?.data || d?.topics || d || [];
+      setTopics(Array.isArray(list) ? list : []);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [batchId, subjectSlug]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (sel) {
+    return (
+      <ContentView
+        batchId={batchId}
+        subjectSlug={subjectSlug}
+        subjectId={subject._id || subject.subjectId || subjectSlug}
+        topic={sel}
+        trail={[...trail, { label: subject.subject || subject.name, fn: () => setSel(null) }]}
+      />
+    );
+  }
+
+  const filtered = topics.filter(t => (t.name || '').toLowerCase().includes(search.toLowerCase()));
+  const ALL_TOPIC = { _id: '__all__', name: '📋 All Content', slug: '__all__', displayOrder: 0, lectureVideos: '∞', notes: '∞' };
+
+  return (
+    <div>
+      <Crumb trail={[...trail, { label: subject.subject || subject.name }]} />
+
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-12 h-12 rounded-2xl overflow-hidden flex-shrink-0 shadow-md bg-gray-100">
+          {subject.icon
+            ? <img src={subject.icon} alt={subject.subject} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+            : <div className="w-full h-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-2xl">📚</div>
+          }
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Subject</p>
+          <h2 className="text-xl font-bold text-gray-900">{subject.subject || subject.name}</h2>
+          {subject.lectureCount > 0 && <p className="text-xs text-gray-400">{subject.lectureCount} lectures</p>}
+        </div>
+      </div>
+
+      {topics.length > 5 && (
+        <div className="relative mb-4">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Chapter search karo..."
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-gray-50" />
+        </div>
+      )}
+
+      {loading && <Spin />}
+      {err && <Err msg={err} retry={load} />}
+      {!loading && !err && filtered.length === 0 && <Empty t="Koi chapter nahi mila" />}
+
+      {!loading && !err && filtered.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div onClick={() => setSel(ALL_TOPIC)}
+            className="flex items-center gap-3 p-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white cursor-pointer hover:shadow-lg transition-all col-span-full">
+            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+              📋
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold leading-snug">All Content</p>
+              <p className="text-xs text-white/70 mt-0.5">Saare topics ka content ek jagah</p>
+            </div>
+            <span className="text-white/70 text-xl">›</span>
+          </div>
+
+          {filtered.map((topic, idx) => (
+            <div key={topic._id || idx} onClick={() => setSel(topic)}
+              className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-100 hover:border-orange-300 hover:shadow-md cursor-pointer transition-all group">
+              <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-amber-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
+                {topic.displayOrder || idx + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 group-hover:text-orange-600 transition-colors leading-snug">{topic.name}</p>
+                <div className="flex gap-3 mt-0.5 text-xs text-gray-400">
+                  {topic.lectureVideos > 0 && <span>🎥 {topic.lectureVideos}</span>}
+                  {topic.notes > 0 && <span>📄 {topic.notes}</span>}
                   {topic.exercises > 0 && <span>📝 {topic.exercises}</span>}
                 </div>
               </div>
