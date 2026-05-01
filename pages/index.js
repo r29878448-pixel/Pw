@@ -1743,7 +1743,7 @@ function BatchesGrid({ onSelect }) {
           <div className="w-72 h-full bg-black text-white p-6 border-r border-gray-800" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-8">
               <img src="https://i.ibb.co/m53b0YKH/file-00000000d664720997f7f5165cbd5131.png" alt="Mission-Pw" className="w-12 h-12 rounded-xl object-cover" />
-              <span className="text-xl font-bold">PW</span>
+              <span className="text-xl font-bold">Mission-PW</span>
             </div>
             <div className="space-y-2">
               <button 
