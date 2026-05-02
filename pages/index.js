@@ -423,7 +423,7 @@ function TopicsView({ batchId, subject, trail }) {
                 <div className="flex gap-3 mt-0.5 text-xs text-gray-400">
                   {topic.lectureVideos > 0 && <span>🎥 {topic.lectureVideos}</span>}
                   {topic.notes > 0 && <span>📄 {topic.notes}</span>}
-                  {topic.exercises > 0 && <span>📝 {topic.exercises}  const pdfs = [];
+                  {topic.exercises > 0 && <span>📝 {topic.exercises}</span> const pdfs = [];
   for (const hw of item.homeworkIds || []) {
     for (const att of hw.attachmentIds || []) {
       if (!att.key) continue;
